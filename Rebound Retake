@@ -1,0 +1,171 @@
+--========================================================--
+--             DOORS - BLA2 7% RANDOM SYSTEM             --
+--========================================================--
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+
+--========================================================--
+-- SETTINGS
+--========================================================--
+
+local CHANCE = 7
+
+local BLA2_URL =
+    "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Bla2"
+
+--========================================================--
+-- GAME DATA
+--========================================================--
+
+local GameData = ReplicatedStorage:WaitForChild("GameData", 15)
+
+if not GameData then
+    warn("[BLA2 7%] Không tìm thấy GameData!")
+    return
+end
+
+local LatestRoom = GameData:WaitForChild("LatestRoom", 15)
+
+if not LatestRoom then
+    warn("[BLA2 7%] Không tìm thấy LatestRoom!")
+    return
+end
+
+--========================================================--
+-- VARIABLES
+--========================================================--
+
+-- Quan trọng:
+-- Lấy phòng hiện tại khi script bắt đầu nhưng KHÔNG random.
+local LastRoom = LatestRoom.Value
+
+-- Những room đã random
+local RolledRooms = {}
+
+-- Đang load Bla2 hay không
+local LoadingBla2 = false
+
+--========================================================--
+-- LOAD BLA2
+--========================================================--
+
+local function RunBla2()
+
+    if LoadingBla2 then
+        return
+    end
+
+    LoadingBla2 = true
+
+    task.spawn(function()
+
+        print("[BLA2 7%] ĐÃ TRÚNG 7%!")
+        print("[BLA2 7%] Đang tải script...")
+
+        local Success, Error = pcall(function()
+
+            local Source = game:HttpGet(BLA2_URL)
+
+            if not Source or Source == "" then
+                error("Bla2 trả về code rỗng!")
+            end
+
+            local Function, CompileError = loadstring(Source)
+
+            if not Function then
+                error("Loadstring lỗi: " .. tostring(CompileError))
+            end
+
+            Function()
+        end)
+
+        if Success then
+            print("[BLA2 7%] Bla2 đã được kích hoạt!")
+        else
+            warn("[BLA2 7%] LỖI KHI CHẠY BLA2:")
+            warn(Error)
+        end
+
+        LoadingBla2 = false
+    end)
+end
+
+--========================================================--
+-- RANDOM ROOM
+--========================================================--
+
+local function RandomRoom(RoomNumber)
+
+    RoomNumber = tonumber(RoomNumber)
+
+    if not RoomNumber then
+        return
+    end
+
+    -- Không random trùng
+    if RolledRooms[RoomNumber] then
+        return
+    end
+
+    RolledRooms[RoomNumber] = true
+
+    local Roll = math.random(1, 100)
+
+    print("----------------------------------------")
+    print("[BLA2 7%] Room:", RoomNumber)
+    print("[BLA2 7%] Roll:", Roll)
+
+    if Roll <= CHANCE then
+
+        print("[BLA2 7%] >>> TRÚNG 7% <<<")
+
+        RunBla2()
+
+    else
+
+        print("[BLA2 7%] Không trúng 7%.")
+
+    end
+
+    print("----------------------------------------")
+end
+
+--========================================================--
+-- ROOM CHANGED
+--========================================================--
+
+LatestRoom:GetPropertyChangedSignal("Value"):Connect(function()
+
+    local NewRoom = LatestRoom.Value
+
+    -- Không xử lý nếu giá trị không thực sự đổi
+    if NewRoom == LastRoom then
+        return
+    end
+
+    LastRoom = NewRoom
+
+    -- Đợi game chuyển phòng hoàn tất
+    task.wait(0.15)
+
+    -- Random đúng 1 lần
+    RandomRoom(NewRoom)
+end)
+
+--========================================================--
+-- START
+--========================================================--
+
+print("========================================")
+print("        BLA2 7% RANDOM SYSTEM")
+print("========================================")
+print("Script đã bật.")
+print("Phòng hiện tại:", LastRoom)
+print("Phòng hiện tại KHÔNG random.")
+print("Mỗi phòng mới: 7% kích hoạt Bla2.")
+print("93%: không kích hoạt.")
+print("Không random trùng phòng.")
+print("========================================")
