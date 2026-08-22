@@ -1,0 +1,453 @@
+--========================================================--
+--              IS HARD - DOORS 38% RANDOM               --
+--                  DELTA EXECUTOR                       --
+--========================================================--
+
+repeat task.wait() until game:IsLoaded()
+
+--========================================================--
+-- SERVICES
+--========================================================--
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+
+--========================================================--
+-- CONFIG
+--========================================================--
+
+local CHANCE = 38
+
+local ISHARD_URL =
+    "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Is%20hard"
+
+--========================================================--
+-- VARIABLES
+--========================================================--
+
+local CurrentRooms =
+    Workspace:WaitForChild("CurrentRooms", 30)
+
+if not CurrentRooms then
+    warn("[IS HARD HUB] Không tìm thấy CurrentRooms!")
+    return
+end
+
+local CheckedRooms = {}
+local ConnectedDoors = {}
+local RunningIsHard = false
+
+--========================================================--
+-- LOAD IS HARD SCRIPT
+--========================================================--
+
+local function LoadIsHard()
+
+    if RunningIsHard then
+        return
+    end
+
+    RunningIsHard = true
+
+    task.spawn(function()
+
+        print("[IS HARD] Đang tải script...")
+
+        local success, errorMessage = pcall(function()
+
+            -- Lấy source của Is Hard
+            local source = game:HttpGet(ISHARD_URL)
+
+            if not source or source == "" then
+                error("Is Hard trả về source rỗng!")
+            end
+
+            print("[IS HARD] Đã tải source!")
+
+            -- Compile script
+            local IsHardFunction, compileError =
+                loadstring(source)
+
+            if not IsHardFunction then
+                error(
+                    "Không compile được Is Hard: "
+                    .. tostring(compileError)
+                )
+            end
+
+            print("[IS HARD] Đã compile!")
+
+            -- CHẠY IS HARD
+            local result = IsHardFunction()
+
+            print("[IS HARD] >>> IS HARD ĐÃ KÍCH HOẠT <<<")
+
+            return result
+
+        end)
+
+        if not success then
+
+            warn(
+                "[IS HARD] LỖI KHI CHẠY:",
+                errorMessage
+            )
+
+        end
+
+        task.wait(0.5)
+
+        RunningIsHard = false
+
+    end)
+
+end
+
+--========================================================--
+-- RANDOM 38%
+--========================================================--
+
+local function RandomRoom(room)
+
+    if not room then
+        return
+    end
+
+    -- Không random trùng phòng
+    if CheckedRooms[room] then
+        return
+    end
+
+    -- Đánh dấu ngay khi roll
+    CheckedRooms[room] = true
+
+    local randomNumber =
+        math.random(1, 100)
+
+    print(
+        "[IS HARD RANDOM]",
+        room.Name,
+        "=>",
+        randomNumber .. "/100"
+    )
+
+    -- 38%
+    if randomNumber <= CHANCE then
+
+        print(
+            "[IS HARD RANDOM] ⭐ TRÚNG 38%:",
+            room.Name
+        )
+
+        LoadIsHard()
+
+    else
+
+        print(
+            "[IS HARD RANDOM] ❌ TRƯỢT:",
+            room.Name
+        )
+
+    end
+
+end
+
+--========================================================--
+-- CONNECT PROMPT
+--========================================================--
+
+local function ConnectPrompt(room, prompt)
+
+    if not prompt then
+        return
+    end
+
+    if ConnectedDoors[prompt] then
+        return
+    end
+
+    ConnectedDoors[prompt] = true
+
+    prompt.Triggered:Connect(function(player)
+
+        if player ~= LocalPlayer then
+            return
+        end
+
+        if CheckedRooms[room] then
+            return
+        end
+
+        task.wait(0.1)
+
+        RandomRoom(room)
+
+    end)
+
+end
+
+--========================================================--
+-- WATCH DOOR
+--========================================================--
+
+local function WatchDoor(room)
+
+    if not room then
+        return
+    end
+
+    if CheckedRooms[room] then
+        return
+    end
+
+    local door =
+        room:FindFirstChild("Door")
+
+    if not door then
+
+        task.spawn(function()
+
+            for i = 1, 100 do
+
+                if not room.Parent then
+                    return
+                end
+
+                if CheckedRooms[room] then
+                    return
+                end
+
+                door =
+                    room:FindFirstChild("Door")
+
+                if door then
+                    WatchDoor(room)
+                    return
+                end
+
+                task.wait(0.1)
+
+            end
+
+        end)
+
+        return
+    end
+
+    --====================================================--
+    -- OPEN BOOLVALUE
+    --====================================================--
+
+    local Open =
+        door:FindFirstChild("Open")
+
+    if Open and Open:IsA("BoolValue") then
+
+        if not ConnectedDoors[Open] then
+
+            ConnectedDoors[Open] = true
+
+            Open:GetPropertyChangedSignal(
+                "Value"
+            ):Connect(function()
+
+                if Open.Value == true then
+                    RandomRoom(room)
+                end
+
+            end)
+
+        end
+
+    end
+
+    --====================================================--
+    -- OPEN ATTRIBUTE
+    --====================================================--
+
+    if door:GetAttribute("Open") ~= nil then
+
+        local attributeKey =
+            tostring(door) .. "_OPEN"
+
+        if not ConnectedDoors[attributeKey] then
+
+            ConnectedDoors[attributeKey] = true
+
+            door:GetAttributeChangedSignal(
+                "Open"
+            ):Connect(function()
+
+                if door:GetAttribute("Open") == true then
+                    RandomRoom(room)
+                end
+
+            end)
+
+        end
+
+    end
+
+    --====================================================--
+    -- PROXIMITY PROMPT
+    --====================================================--
+
+    local prompt =
+        door:FindFirstChildWhichIsA(
+            "ProximityPrompt",
+            true
+        )
+
+    if prompt then
+        ConnectPrompt(room, prompt)
+    end
+
+    --====================================================--
+    -- NEW DESCENDANTS
+    --====================================================--
+
+    if not ConnectedDoors[door] then
+
+        ConnectedDoors[door] = true
+
+        door.DescendantAdded:Connect(
+            function(obj)
+
+                if CheckedRooms[room] then
+                    return
+                end
+
+                if obj:IsA("ProximityPrompt") then
+
+                    ConnectPrompt(
+                        room,
+                        obj
+                    )
+
+                elseif
+                    obj:IsA("BoolValue")
+                    and obj.Name == "Open"
+                then
+
+                    if ConnectedDoors[obj] then
+                        return
+                    end
+
+                    ConnectedDoors[obj] = true
+
+                    obj:GetPropertyChangedSignal(
+                        "Value"
+                    ):Connect(function()
+
+                        if obj.Value == true then
+                            RandomRoom(room)
+                        end
+
+                    end)
+
+                end
+
+            end
+        )
+
+    end
+
+end
+
+--========================================================--
+-- RANDOM SEED
+--========================================================--
+
+math.randomseed(
+    os.time()
+    + math.floor(os.clock() * 100000)
+)
+
+math.random()
+math.random()
+math.random()
+
+--========================================================--
+-- DO NOT RANDOM ROOMS ALREADY EXISTING
+--========================================================--
+
+for _, room in ipairs(
+    CurrentRooms:GetChildren()
+) do
+
+    CheckedRooms[room] = true
+
+end
+
+--========================================================--
+-- NEW ROOM
+--========================================================--
+
+CurrentRooms.ChildAdded:Connect(
+    function(room)
+
+        if not room then
+            return
+        end
+
+        task.wait(0.25)
+
+        if not room.Parent then
+            return
+        end
+
+        -- Phòng mới được phép random
+        CheckedRooms[room] = nil
+
+        WatchDoor(room)
+
+        -- Door có thể spawn sau Room
+        room.ChildAdded:Connect(
+            function(child)
+
+                if CheckedRooms[room] then
+                    return
+                end
+
+                if child.Name == "Door" then
+
+                    task.wait(0.1)
+
+                    if room.Parent then
+                        WatchDoor(room)
+                    end
+
+                end
+
+            end
+        )
+
+    end
+)
+
+--========================================================--
+-- CLEANUP
+--========================================================--
+
+CurrentRooms.ChildRemoved:Connect(
+    function(room)
+
+        CheckedRooms[room] = nil
+
+    end
+)
+
+--========================================================--
+-- LOADED
+--========================================================--
+
+print("==============================================")
+print("       IS HARD RANDOM 38% - LOADED")
+print("==============================================")
+print("38%   : TRÚNG -> CHẠY IS HARD")
+print("62%   : TRƯỢT")
+print("Phòng : KHÔNG RANDOM TRÙNG")
+print("Start : KHÔNG TỰ KÍCH HOẠT")
+print("==============================================")
