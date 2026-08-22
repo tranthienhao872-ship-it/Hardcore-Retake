@@ -1,0 +1,140 @@
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+
+-- Biến kiểm tra để đảm bảo chỉ nhận thành tựu 1 lần duy nhất
+local hasGottenAchievement = false 
+
+local function spawnShocker()
+    -- Cập nhật lại character và humanoid mỗi khi spawn để tránh lỗi khi người chơi reset/chết
+    character = player.Character or player.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
+
+    local shockerModel = game:GetObjects("rbxassetid://16167846540")[1]
+    local camera = Workspace.CurrentCamera
+
+    local rootPart = shockerModel:FindFirstChild("HumanoidRootPart") or shockerModel:FindFirstChildWhichIsA("Part")
+    shockerModel.PrimaryPart = rootPart
+    shockerModel:SetPrimaryPartCFrame(camera.CFrame * CFrame.new(0, 0, -7))
+    shockerModel.Parent = Workspace
+
+    local oogaBoogaaPart = shockerModel:WaitForChild("OOGA BOOGAAAA")
+    local horrorScream = oogaBoogaaPart:WaitForChild("HORROR SCREAM 15")
+    local boneSound = oogaBoogaaPart:FindFirstChild("Bone")
+
+    local lookDuration = 2
+    local lookStart = nil
+    local hasTriggered = false
+    local hasFallen = false
+
+    local function fallToGround()
+        if hasFallen then return end
+        hasFallen = true
+
+        oogaBoogaaPart.Anchored = false
+        oogaBoogaaPart.CanCollide = false
+
+        task.delay(1.2, function()
+            if shockerModel then
+                shockerModel:Destroy()
+            end
+        end)
+    end
+
+    local connection
+    connection = game:GetService("RunService").RenderStepped:Connect(function()
+        if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+        if hasTriggered then connection:Disconnect() return end
+
+        local directionToShocker = (oogaBoogaaPart.Position - camera.CFrame.Position).Unit
+        local playerLookVector = camera.CFrame.LookVector
+        local dot = directionToShocker:Dot(playerLookVector)
+
+        if dot > 0.85 then
+            if not lookStart then
+                lookStart = tick()
+            elseif tick() - lookStart >= lookDuration then
+                hasTriggered = true
+                connection:Disconnect()
+
+                horrorScream:Play()
+                if boneSound then boneSound:Play() end
+                humanoid:TakeDamage(30)
+
+                local targetPos = character.HumanoidRootPart.Position + Vector3.new(0, 2, 0)
+                local tweenInfo = TweenInfo.new(1.2, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+                local tween = TweenService:Create(oogaBoogaaPart, tweenInfo, {Position = targetPos})
+                tween:Play()
+
+                tween.Completed:Connect(function()
+                    fallToGround()
+                end)
+
+                -- Death message
+                ReplicatedStorage.GameStats["Player_".. player.Name].Total.DeathCause.Value = "Shocker"
+                firesignal(ReplicatedStorage.RemotesFolder.DeathHint.OnClientEvent, {
+                    "You died to who you call Shocker...",
+                    "Don't look at it or it stuns you!"
+                }, "Blue")
+            end
+        else
+            connection:Disconnect()
+            fallToGround()
+        end
+    end)
+
+    task.delay(5, function()
+        if not hasTriggered and not hasFallen then
+            fallToGround()
+        end
+    end)
+
+    -- Achievement (Chỉ chạy 1 lần)
+    if not hasGottenAchievement then
+        hasGottenAchievement = true
+        local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
+        achievementGiver({
+            Title = "Shocking Experience",
+            Desc = "Look at me.",
+            Reason = "Encounter Shocker.",
+            Image = "rbxassetid://17857830685"
+        })
+    end
+end
+
+-- ==============================================================
+-- HỆ THỐNG XUẤT HIỆN QUA TỪNG PHÒNG VÀ KIỂM TRA THỜI GIAN
+-- ==============================================================
+local latestRoom = ReplicatedStorage:WaitForChild("GameData"):WaitForChild("LatestRoom")
+local roomStayThread = nil -- Biến lưu trữ luồng đếm thời gian ở trong phòng
+
+latestRoom.Changed:Connect(function(roomNumber)
+    -- Nếu có đếm thời gian của phòng trước đó thì hủy đi (vì đã qua phòng mới)
+    if roomStayThread then
+        task.cancel(roomStayThread)
+        roomStayThread = nil
+    end
+
+    if roomNumber > 0 then
+        -- 1. Tỉ lệ 55% xuất hiện khi mở cửa (sẽ có 45% lúc an toàn không bị gì)
+        local chance = math.random(1, 100)
+        if chance <= 55 then
+            -- Không spawn liền ngay khi mở cửa (Đợi ngẫu nhiên 1.5s đến 3s để tự nhiên hơn)
+            task.delay(math.random(1.5, 3), function()
+                spawnShocker()
+            end)
+        end
+
+        -- 2. Bộ đếm thời gian ở quá lâu trong phòng (AFK Penalty)
+        -- Random từ 20 đến 30 giây. Nếu ở trong phòng quá mốc này mà không qua phòng mới -> Spawn
+        local timeLimit = math.random(20, 30)
+        roomStayThread = task.delay(timeLimit, function()
+            spawnShocker()
+        end)
+    end
+end)
+
