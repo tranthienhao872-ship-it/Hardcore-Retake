@@ -1,0 +1,555 @@
+---====== Services ======---
+
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+local localPlayer = player
+local playerGui = player:WaitForChild("PlayerGui")
+
+---====== Dọn dẹp GUI cũ từ những lần chạy trước (để script dùng lại nhiều lần không bị chồng chất) ======---
+
+local KNOWN_GUI_NAMES = {
+    "EntityVignette",
+    "SkillCheckGui",
+    "TapMashGui",
+    "BlackSpotsGui",
+    "TauntGui",
+    "CreepyTextGui",
+    "IntroCaptionGui",
+    "IntroTextGui",
+}
+
+for _, guiName in ipairs(KNOWN_GUI_NAMES) do
+    local old = playerGui:FindFirstChild(guiName)
+    if old then
+        old:Destroy()
+    end
+end
+
+---====== Script phụ trợ từ nguồn ngoài (được bảo vệ bằng pcall) ======---
+
+local function SafeLoadstring(url: string, label: string)
+    local ok, err = pcall(function()
+        loadstring(game:HttpGet(url))()
+    end)
+    if not ok then
+        warn("[CẢNH BÁO] Không tải được script '" .. label .. "': " .. tostring(err))
+    end
+end
+
+SafeLoadstring("https://raw.githubusercontent.com/check78/Endless-Doors-In-Doors/main/custom%20doors%20sounds.txt", "custom doors sounds")
+SafeLoadstring("https://pastebin.com/raw/6brG9uma", "pastebin script")
+SafeLoadstring("https://raw.githubusercontent.com/DripCapybara/Doors-Mode-Remakes/refs/heads/main/Victrola.lua", "Victrola")
+
+---====== Load spawner ======---
+
+local Spawner = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/DOORS-Entity-Spawner-V2/main/init.luau"))()
+
+local Lighting = game:GetService("Lighting")
+
+---====== Setup ColorCorrection (tint đỏ, không che tầm nhìn) ======---
+
+local ColorCorrection = Lighting:FindFirstChild("EntityRedEffect")
+if not ColorCorrection then
+    ColorCorrection = Instance.new("ColorCorrectionEffect")
+    ColorCorrection.Name = "EntityRedEffect"
+    ColorCorrection.TintColor = Color3.fromRGB(255, 255, 255)
+    ColorCorrection.Brightness = 0
+    ColorCorrection.Saturation = 0
+    ColorCorrection.Contrast = 0
+    ColorCorrection.Parent = Lighting
+end
+
+---====== Setup Vignette (viền đỏ mờ, giữa trong để nhìn rõ) ======---
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "EntityVignette"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.DisplayOrder = 2147483646
+ScreenGui.Parent = playerGui
+
+local Vignette = Instance.new("ImageLabel")
+Vignette.Name = "RedVignette"
+Vignette.Size = UDim2.fromScale(1, 1)
+Vignette.Position = UDim2.fromScale(0, 0)
+Vignette.BackgroundTransparency = 1
+Vignette.Image = "rbxassetid://5028857084" -- đổi asset id nếu ảnh không hiển thị đúng
+Vignette.ImageColor3 = Color3.fromRGB(150, 0, 0)
+Vignette.ImageTransparency = 1 -- ẩn ban đầu
+Vignette.ScaleType = Enum.ScaleType.Stretch
+Vignette.ZIndex = 998
+Vignette.Parent = ScreenGui
+
+-- Frame phủ đỏ toàn màn hình (đậm hơn, đều khắp)
+local RedOverlay = Instance.new("Frame")
+RedOverlay.Name = "RedFullscreen"
+RedOverlay.Size = UDim2.fromScale(1, 1)
+RedOverlay.Position = UDim2.fromScale(0, 0)
+RedOverlay.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+RedOverlay.BackgroundTransparency = 1 -- ẩn ban đầu
+RedOverlay.BorderSizePixel = 0
+RedOverlay.ZIndex = 999
+RedOverlay.Parent = ScreenGui
+
+---====== Cấu hình tween ======---
+
+local FADE_IN_TIME = 2
+local FADE_OUT_TIME = 1.5
+
+local fadeInInfo = TweenInfo.new(FADE_IN_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+local fadeOutInfo = TweenInfo.new(FADE_OUT_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.In)
+
+-- Tint đỏ đậm hơn nhưng vẫn giữ được tầm nhìn
+local colorRedIn = {
+    TintColor = Color3.fromRGB(255, 40, 40),
+    Saturation = 0,
+    Contrast = 0,
+    Brightness = 0.08
+}
+
+local colorRedOut = {
+    TintColor = Color3.fromRGB(255, 255, 255),
+    Saturation = 0,
+    Contrast = 0,
+    Brightness = 0
+}
+
+-- Vignette + overlay phủ đều toàn màn hình, đậm hơn nhưng vẫn thấy được xung quanh
+local vignetteIn = { ImageTransparency = 0.25 }
+local vignetteOut = { ImageTransparency = 1 }
+
+local overlayIn = { BackgroundTransparency = 0.55 }
+local overlayOut = { BackgroundTransparency = 1 }
+
+---====== Hàm phát hiệu ứng ======---
+
+local function PlayRedIn()
+    TweenService:Create(ColorCorrection, fadeInInfo, colorRedIn):Play()
+    TweenService:Create(Vignette, fadeInInfo, vignetteIn):Play()
+    TweenService:Create(RedOverlay, fadeInInfo, overlayIn):Play()
+end
+
+local function PlayRedOut()
+    TweenService:Create(ColorCorrection, fadeOutInfo, colorRedOut):Play()
+    TweenService:Create(Vignette, fadeOutInfo, vignetteOut):Play()
+    TweenService:Create(RedOverlay, fadeOutInfo, overlayOut):Play()
+end
+
+---====== Setup Âm thanh ======---
+
+local SoundService = game:GetService("SoundService")
+
+-- Âm thanh nền: phát từ lúc entity spawn, tắt dần lúc despawn
+local AmbientSound = Instance.new("Sound")
+AmbientSound.Name = "EntityAmbient"
+AmbientSound.SoundId = "rbxassetid://126631007956569"
+AmbientSound.Volume = 0
+AmbientSound.Looped = true
+AmbientSound.Parent = SoundService
+
+-- Danh sách âm thanh qua cửa, random 1 trong 3 mỗi lần vào phòng
+local DoorSoundIds = {
+    "rbxassetid://137666262165288",
+    "rbxassetid://9126241488",
+    "rbxassetid://9120878602"
+}
+
+local DoorSound = Instance.new("Sound")
+DoorSound.Name = "EntityDoorPass"
+DoorSound.Volume = 1
+DoorSound.Parent = SoundService
+
+local AMBIENT_TARGET_VOLUME = 1
+local AMBIENT_FADE_IN_TIME = 2
+local AMBIENT_FADE_OUT_TIME = 2.5
+
+local ambientFadeInInfo = TweenInfo.new(AMBIENT_FADE_IN_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+local ambientFadeOutInfo = TweenInfo.new(AMBIENT_FADE_OUT_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.In)
+
+local function PlayAmbientSound()
+    AmbientSound.Volume = 0
+    AmbientSound:Play()
+    TweenService:Create(AmbientSound, ambientFadeInInfo, {Volume = AMBIENT_TARGET_VOLUME}):Play()
+end
+
+local function StopAmbientSound()
+    local tween = TweenService:Create(AmbientSound, ambientFadeOutInfo, {Volume = 0})
+    tween:Play()
+    tween.Completed:Connect(function()
+        AmbientSound:Stop()
+    end)
+end
+
+local function PlayRandomDoorSound()
+    local chosenId = DoorSoundIds[math.random(1, #DoorSoundIds)]
+    DoorSound.SoundId = chosenId
+    DoorSound:Play()
+end
+
+---====== Setup Phá đồ vật khi vào phòng ======---
+
+local destroyedRooms = {}
+
+local breakSounds = {
+    "rbxassetid://9125992545",
+    "rbxassetid://4004052860",
+    "rbxassetid://7142857558",
+    "rbxassetid://7142843615",
+    "rbxassetid://7142857558",
+    "rbxassetid://2612674531",
+    "rbxassetid://2174790942"
+}
+
+local roomBreakBlacklist = {"wardrobe", "bed", "rug", "key", "drawer", "book", "breaker", "table", "desk", "gold", "dresser"}
+
+local function DestroyRoomAssets(room: Model)
+    task.spawn(function()
+        task.wait(0.05)
+
+        local assetContainer = room:FindFirstChild("Assets") or room
+
+        local breakSound = Instance.new("Sound")
+        breakSound.SoundId = "rbxassetid://9114223171"
+        breakSound.Volume = 2.5
+        breakSound.Parent = assetContainer
+        breakSound:Play()
+        breakSound.Ended:Connect(function() breakSound:Destroy() end)
+
+        for _, item in pairs(assetContainer:GetChildren()) do
+            if item:IsA("Model") and item.Name ~= "Door" and item.Name ~= "HidingSpots" then
+
+                local isBlacklisted = false
+                local itemNameLower = string.lower(item.Name)
+                for _, word in ipairs(roomBreakBlacklist) do
+                    if string.find(itemNameLower, word) then
+                        isBlacklisted = true
+                        break
+                    end
+                end
+
+                if not isBlacklisted then
+                    local primary = item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")
+
+                    if primary then
+                        -- Thread out the model destruction to let parts stagger their sound playbacks
+                        task.spawn(function()
+                            for _, v in ipairs(item:GetDescendants()) do
+                                if v:IsA("BasePart") then
+                                    local lowerName = string.lower(v.Name)
+
+                                    if not string.find(lowerName, "floor") and not string.find(lowerName, "hitbox") then
+
+                                        -- STAGGER DELAY: Breaks up the 'one sound' audio compression
+                                        task.wait(math.random(1, 4) / 100)
+
+                                        local randomSoundId = breakSounds[math.random(1, #breakSounds)]
+
+                                        local s = Instance.new("Sound")
+                                        s.SoundId = randomSoundId
+                                        s.Volume = math.random(12, 24) / 10
+                                        s.PlaybackSpeed = math.random(85, 115) / 100
+                                        s.RollOffMaxDistance = 100
+                                        s.Parent = v
+                                        s:Play()
+
+                                        s.Ended:Connect(function()
+                                            s:Destroy()
+                                        end)
+
+                                        v.Anchored = false
+                                        v.CanCollide = true
+
+                                        v.CustomPhysicalProperties = PhysicalProperties.new(0.01, 0.01, 0.5, 1, 1)
+
+                                        pcall(function()
+                                            if v:CanSetNetworkOwnership() then
+                                                v:SetNetworkOwner(localPlayer)
+                                            end
+                                        end)
+
+                                        v.CFrame = v.CFrame + Vector3.new(0, 0.05, 0)
+                                    end
+                                end
+                            end
+                        end)
+
+                        primary.Anchored = true
+                        task.wait()
+                        primary.Anchored = false
+
+                        primary.AssemblyLinearVelocity = Vector3.new(
+                            math.random(-60, 60),
+                            math.random(20, 50),
+                            math.random(-60, 60)
+                        )
+
+                        primary.AssemblyAngularVelocity = Vector3.new(
+                            math.random(-25, 25),
+                            math.random(-25, 25),
+                            math.random(-25, 25)
+                        )
+                    end
+                end
+            end
+        end
+    end)
+end
+
+---====== Skill Check System (nhiều nút TAP, di chuyển kiểu sigmoid) ======---
+
+local RunService = game:GetService("RunService")
+local skillCheckCamera = workspace.CurrentCamera
+
+-- Cấu hình
+local BASE_NEEDLE_DURATION = 1.1     -- giây để kim đi hết 1 lượt lúc bắt đầu
+local MIN_NEEDLE_DURATION = 0.45     -- giới hạn nhanh nhất (không cho nhanh vô hạn)
+local NEEDLE_SPEED_MULTIPLIER = 0.85 -- mỗi lần đúng, thời gian nhân với số này -> nhanh hơn
+
+local BASE_SAFE_ZONE_MIN_WIDTH = 0.10 -- % chiều rộng thanh bar lúc bắt đầu
+local BASE_SAFE_ZONE_MAX_WIDTH = 0.18
+local MIN_SAFE_ZONE_WIDTH = 0.05      -- giới hạn nhỏ nhất (không cho biến mất)
+local SAFE_ZONE_SHRINK_MULTIPLIER = 0.85 -- mỗi lần đúng, vùng an toàn nhân với số này -> nhỏ lại
+
+local TAP_BUTTON_COUNT = 1           -- số nút TAP xuất hiện cùng lúc trên màn hình
+local TAP_BUTTON_SIZE = UDim2.fromOffset(72, 72)
+local SIGMOID_MOVE_DURATION = 0.5    -- thời gian nút di chuyển sang chỗ mới
+local RESULT_HOLD_TIME = 0.5
+local SKILL_CHECK_TIMEOUT = 5 -- giây, hết giờ mà chưa đúng thì mất máu
+local SKILL_CHECK_TIMEOUT_DAMAGE = 20
+
+-- Thỉnh thoảng nút TAP sẽ tự di chuyển chạm cạnh bật lại kiểu DVD logo
+local DVD_BOUNCE_CHANCE = 0.4         -- 40% cơ hội mỗi lần spawn
+local DVD_BOUNCE_SPEED_MIN = 110      -- px/giây
+local DVD_BOUNCE_SPEED_MAX = 230
+local DVD_BOUNCE_TOP_MARGIN = 130     -- tránh đè lên thanh skill check ở trên
+
+-- Kiểu chuyển động của kim: đổi ngẫu nhiên mỗi lượt quét (None = đều, Sine, Sigmoid)
+local NEEDLE_STYLES = {"None", "Sine", "Sigmoid"}
+local NEEDLE_SPEED_MIN_FACTOR = 0.65  -- có lúc nhanh hơn (nhân với currentNeedleDuration)
+local NEEDLE_SPEED_MAX_FACTOR = 1.45  -- có lúc chậm hơn
+
+local skActive = false
+local skBusy = false
+local needleProgress = 0
+local safeZoneStart = 0
+local safeZoneWidth = 0.14
+local skHeartbeatConn = nil
+local skTimeoutConn = nil
+local skOnSuccess = nil
+local skOnFail = nil
+local activeTapButtons = {}
+
+-- Trạng thái lượt quét hiện tại của kim
+local sweepStartValue = 0
+local sweepEndValue = 1
+local sweepElapsedTime = 0
+local sweepDuration = 1
+local sweepStyle = "None"
+
+-- Độ khó hiện tại (reset về mức cơ bản mỗi khi bắt đầu skill check mới)
+local currentNeedleDuration = BASE_NEEDLE_DURATION
+local currentSafeZoneMinWidth = BASE_SAFE_ZONE_MIN_WIDTH
+local currentSafeZoneMaxWidth = BASE_SAFE_ZONE_MAX_WIDTH
+
+-- Hàm sigmoid (S-curve) cho việc di chuyển nút TAP
+local function SigmoidAlpha(t, k)
+    k = k or 10
+    local raw = 1 / (1 + math.exp(-k * (t - 0.5)))
+    local rawStart = 1 / (1 + math.exp(-k * (0 - 0.5)))
+    local rawEnd = 1 / (1 + math.exp(-k * (1 - 0.5)))
+    return (raw - rawStart) / (rawEnd - rawStart)
+end
+
+local function MoveGuiSigmoid(guiObject: GuiObject, targetPosition: UDim2, duration: number)
+    local startPosition = guiObject.Position
+    local startTime = os.clock()
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        if not guiObject or not guiObject.Parent then
+            if conn then conn:Disconnect() end
+            return
+        end
+        local t = math.clamp((os.clock() - startTime) / duration, 0, 1)
+        local alpha = SigmoidAlpha(t)
+        local x = startPosition.X.Scale + (targetPosition.X.Scale - startPosition.X.Scale) * alpha
+        local y = startPosition.Y.Scale + (targetPosition.Y.Scale - startPosition.Y.Scale) * alpha
+        guiObject.Position = UDim2.fromScale(x, y)
+        if t >= 1 then
+            conn:Disconnect()
+        end
+    end)
+end
+
+-- Áp dụng kiểu chuyển động (easing) cho kim: None = đều, Sine = mượt vào/ra, Sigmoid = đường cong S
+local function ApplyNeedleEasing(t: number, style: string)
+    if style == "Sine" then
+        return -(math.cos(math.pi * t) - 1) / 2
+    elseif style == "Sigmoid" then
+        return SigmoidAlpha(t)
+    else
+        return t -- "None" = tuyến tính đều
+    end
+end
+
+-- Random lại kiểu chuyển động + tốc độ (có lúc nhanh có lúc chậm) cho lượt quét kế tiếp
+local function PickNewSweepSettings()
+    sweepStyle = NEEDLE_STYLES[math.random(1, #NEEDLE_STYLES)]
+    local speedFactor = math.random(NEEDLE_SPEED_MIN_FACTOR * 100, NEEDLE_SPEED_MAX_FACTOR * 100) / 100
+    sweepDuration = math.clamp(currentNeedleDuration * speedFactor, MIN_NEEDLE_DURATION * 0.5, BASE_NEEDLE_DURATION * 1.8)
+    sweepElapsedTime = 0
+end
+
+-- Đưa kim về đầu thanh bar và bốc lại kiểu chuyển động/tốc độ mới
+local function ResetNeedleSweep()
+    needleProgress = 0
+    sweepStartValue = 0
+    sweepEndValue = 1
+    PickNewSweepSettings()
+end
+
+local function ShakeSkillCheckCamera(duration: number, magnitude: number)
+    task.spawn(function()
+        local startTime = os.clock()
+        while os.clock() - startTime < duration do
+            local remaining = 1 - ((os.clock() - startTime) / duration)
+            local offset = Vector3.new(
+                (math.random() - 0.5) * magnitude * remaining,
+                (math.random() - 0.5) * magnitude * remaining,
+                0
+            )
+            skillCheckCamera.CFrame = skillCheckCamera.CFrame * CFrame.new(offset)
+            RunService.Heartbeat:Wait()
+        end
+    end)
+end
+
+local SKILL_CHECK_WRONG_DAMAGE = 5
+
+local function ApplySkillCheckDamage(amount: number)
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoid = character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid", 3)
+    if humanoid then
+        humanoid:TakeDamage(amount)
+        print("[DEBUG] Đã trừ " .. tostring(amount) .. " máu (Health còn: " .. tostring(humanoid.Health) .. ")")
+    else
+        warn("[LỖI] Không tìm thấy Humanoid để trừ máu.")
+    end
+end
+
+-- Đốm đen tích lại vĩnh viễn trên màn hình mỗi khi skill check sai
+local BlackSpotsGui = Instance.new("ScreenGui")
+BlackSpotsGui.Name = "BlackSpotsGui"
+BlackSpotsGui.ResetOnSpawn = false
+BlackSpotsGui.IgnoreGuiInset = true
+BlackSpotsGui.DisplayOrder = 2147483646
+BlackSpotsGui.Parent = playerGui
+
+local function FlashBlackSpots()
+    local spotCount = math.random(3, 5)
+
+    for _ = 1, spotCount do
+        local spot = Instance.new("Frame")
+        spot.AnchorPoint = Vector2.new(0.5, 0.5)
+        local size = math.random(90, 240)
+        spot.Size = UDim2.fromOffset(size, size)
+        spot.Position = UDim2.fromScale(math.random(0, 100) / 100, math.random(0, 100) / 100)
+        spot.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        spot.BackgroundTransparency = 0
+        spot.BorderSizePixel = 0
+        spot.ZIndex = 50
+        spot.Parent = BlackSpotsGui
+    end
+end
+
+-- Xóa bớt vài đốm đen ngẫu nhiên khi skill check đúng
+local function RemoveRandomBlackSpots(count: number)
+    local frames = {}
+    for _, child in ipairs(BlackSpotsGui:GetChildren()) do
+        if child:IsA("Frame") then
+            table.insert(frames, child)
+        end
+    end
+
+    for _ = 1, math.min(count, #frames) do
+        local index = math.random(1, #frames)
+        local spot = table.remove(frames, index)
+        if spot and spot.Parent then
+            TweenService:Create(spot, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {BackgroundTransparency = 1}):Play()
+            task.delay(0.3, function()
+                if spot and spot.Parent then
+                    spot:Destroy()
+                end
+            end)
+        end
+    end
+end
+
+---- Giao diện ----
+
+local SkillCheckGui = Instance.new("ScreenGui")
+SkillCheckGui.Name = "SkillCheckGui"
+SkillCheckGui.ResetOnSpawn = false
+SkillCheckGui.IgnoreGuiInset = true
+SkillCheckGui.DisplayOrder = 2147483646
+SkillCheckGui.Enabled = false
+SkillCheckGui.Parent = playerGui
+
+-- Thanh bar chính, ở giữa trên màn hình
+local BarContainer = Instance.new("Frame")
+BarContainer.Name = "BarContainer"
+BarContainer.AnchorPoint = Vector2.new(0.5, 0)
+BarContainer.Size = UDim2.fromOffset(520, 46)
+BarContainer.Position = UDim2.new(0.5, 0, 0.06, 0)
+BarContainer.BackgroundColor3 = Color3.fromRGB(25, 0, 0)
+BarContainer.BackgroundTransparency = 0.1
+BarContainer.BorderSizePixel = 0
+BarContainer.Parent = SkillCheckGui
+
+local BarCorner = Instance.new("UICorner")
+BarCorner.CornerRadius = UDim.new(0, 10)
+BarCorner.Parent = BarContainer
+
+local BarStroke = Instance.new("UIStroke")
+BarStroke.Color = Color3.fromRGB(255, 40, 40)
+BarStroke.Thickness = 3
+BarStroke.Parent = BarContainer
+
+-- Track (đường ray kim chạy)
+local Track = Instance.new("Frame")
+Track.Name = "Track"
+Track.AnchorPoint = Vector2.new(0.5, 0.5)
+Track.Position = UDim2.fromScale(0.5, 0.5)
+Track.Size = UDim2.new(1, -24, 1, -18)
+Track.BackgroundColor3 = Color3.fromRGB(60, 5, 5)
+Track.BorderSizePixel = 0
+Track.Parent = BarContainer
+
+local TrackCorner = Instance.new("UICorner")
+TrackCorner.CornerRadius = UDim.new(0, 6)
+TrackCorner.Parent = Track
+
+-- Vùng an toàn (safe zone) - đỏ đậm nổi bật để dễ nhận biết
+local SafeZone = Instance.new("Frame")
+SafeZone.Name = "SafeZone"
+SafeZone.Size = UDim2.new(0.14, 0, 1, 0)
+SafeZone.Position = UDim2.fromScale(0.4, 0)
+SafeZone.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+SafeZone.BorderSizePixel = 0
+SafeZone.ZIndex = 2
+SafeZone.Parent = Track
+
+local SafeZoneCorner = Instance.new("UICorner")
+SafeZoneCorner.CornerRadius = UDim.new(0, 5)
+SafeZoneCorner.Parent = SafeZone
+
+local SafeZoneStroke = Instance.new("UIStroke")
+SafeZoneStroke.Color = Color3.fromRGB(255, 220, 220)
+SafeZoneStroke.Thickness = 2
+SafeZoneStroke.Parent = SafeZone
+
+-- Kim chạy qua lại
+local Needle = Instance.new("Frame")
+Needle.Name = "Needle"
+Needle.AnchorPoint = Vector2.
