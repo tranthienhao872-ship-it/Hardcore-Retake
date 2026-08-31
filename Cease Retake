@@ -18,7 +18,7 @@ local LocalPlayer = Players.LocalPlayer
 -- CONFIG
 --========================================================--
 
-local CHANCE = 38
+local CHANCE = 45
 
 local ISHARD_URL =
     "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Is%20hard"
