@@ -11,7 +11,7 @@ local LocalPlayer = Players.LocalPlayer
 -- SETTINGS
 --========================================================--
 
-local CHANCE = 7
+local CHANCE = 4.5
 
 local BLA2_URL =
     "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Bla2"
