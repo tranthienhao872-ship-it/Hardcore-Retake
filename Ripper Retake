@@ -21,7 +21,7 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 -- SETTINGS
 --========================================================--
 
-local RIPPER_CHANCE = 29
+local RIPPER_CHANCE = 16
 
 local ripperActive = false
 local achievementEarned = false
