@@ -1,0 +1,1910 @@
+--========================================================--
+--                  DEERGOD CONFIG                       --
+--========================================================--
+
+return {
+
+    AntiqueFont = Enum.Font.Antique,
+
+    DeerGodAsset =
+        "rbxassetid://103599825077911",
+
+    DeerGodSpeed = 7.5,
+
+    DeerGodDuration = 95,
+
+    EndSound =
+        "rbxassetid://101395573137763",
+
+    EndingDarkness = 0.65,
+
+    EndingFadeTime = 2,
+
+    BreakScriptURL =
+        "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Ph%C3%A1%20%C4%91%E1%BB%93",
+
+    FakeMCSpawnerURL =
+        "https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/OgHungerNewSpawner",
+
+    GitMusicURL =
+        "https://github.com/eoyoustme/Hardcore/blob/main/Your_Consenting_Mind.mp3?raw=true",
+
+    GitMusicName =
+        "Your",
+
+    RunTexts = {
+
+        "Run",
+        "RUN",
+        "rUn",
+        "ruN",
+        "RuN",
+        "rUN",
+        "RUn",
+        "run",
+        "RU n",
+        "R U N"
+
+    },
+
+    JumpscareImages = {
+
+        "rbxassetid://15813725670",
+        "rbxassetid://15813727511",
+        "rbxassetid://15813727319",
+        "rbxassetid://15813726972",
+        "rbxassetid://15813726866",
+        "rbxassetid://15813726700",
+        "rbxassetid://15813726584",
+        "rbxassetid://15813726463",
+        "rbxassetid://15813726313"
+
+    }
+
+}
+--========================================================--
+--                   DEERGOD CORE                        --
+--========================================================--
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player =
+    Players.LocalPlayer
+
+local playerGui =
+    player:WaitForChild("PlayerGui")
+
+local Character =
+    player.Character
+    or player.CharacterAdded:Wait()
+
+local Humanoid =
+    Character:WaitForChild("Humanoid")
+
+local Root =
+    Character:WaitForChild("HumanoidRootPart")
+
+local currentRooms =
+    workspace:WaitForChild("CurrentRooms")
+
+local Config =
+    getgenv().DeerGodConfig
+
+local System = {}
+
+System.Active = true
+System.Character = Character
+System.Humanoid = Humanoid
+System.Root = Root
+
+System.Caption = nil
+System.DeerGod = nil
+System.BasePart = nil
+
+System.Connection = nil
+System.ScreenGui = nil
+System.Lord = nil
+System.Shake = nil
+
+System.LastRoom = nil
+System.TriggeredRooms = {}
+
+--========================================================--
+-- MAIN UI
+--========================================================--
+
+local mainUI =
+    playerGui:FindFirstChild("MainUI")
+
+if not mainUI then
+    mainUI =
+        playerGui:WaitForChild(
+            "MainUI",
+            10
+        )
+end
+
+if mainUI then
+
+    local mainFrame =
+        mainUI:FindFirstChild("MainFrame")
+
+    if mainFrame then
+
+        System.Caption =
+            mainFrame:FindFirstChild("Caption")
+
+    end
+
+end
+
+if System.Caption then
+
+    System.Caption.Font =
+        Config.AntiqueFont
+
+    System.Caption.TextColor3 =
+        Color3.fromRGB(
+            117,
+            0,
+            175
+        )
+
+end
+
+--========================================================--
+-- TYPEWRITER
+--========================================================--
+
+System.TypeToken = 0
+
+function System:StopTyping()
+
+    self.TypeToken += 1
+
+end
+
+function System:TypeText(
+    text,
+    speed
+)
+
+    if not self.Caption then
+        return
+    end
+
+    self.TypeToken += 1
+
+    local token =
+        self.TypeToken
+
+    self.Caption.Font =
+        Config.AntiqueFont
+
+    self.Caption.Visible =
+        true
+
+    self.Caption.TextTransparency =
+        0
+
+    self.Caption.Text =
+        ""
+
+    for i = 1, #text do
+
+        if not self.Active then
+            return
+        end
+
+        if token ~= self.TypeToken then
+            return
+        end
+
+        self.Caption.Text =
+            string.sub(
+                text,
+                1,
+                i
+            )
+
+        self.Caption.TextTransparency =
+            0
+
+        task.wait(
+            speed or 0.04
+        )
+
+    end
+
+end
+
+--========================================================--
+-- GITHUB SOUND
+--========================================================--
+
+function System:GetGitSound(
+    url,
+    name
+)
+
+    if not (
+        writefile
+        and isfile
+        and game.HttpGet
+        and (
+            getcustomasset
+            or getsynasset
+        )
+    ) then
+
+        return nil
+
+    end
+
+    local filename =
+        name .. ".mp3"
+
+    if not isfile(filename) then
+
+        local success,
+            content =
+            pcall(function()
+
+                return game:HttpGet(
+                    url
+                )
+
+            end)
+
+        if not success
+            or not content then
+
+            return nil
+
+        end
+
+        writefile(
+            filename,
+            content
+        )
+
+    end
+
+    local getasset =
+        getcustomasset
+        or getsynasset
+
+    local success,
+        asset =
+        pcall(function()
+
+            return getasset(
+                filename
+            )
+
+        end)
+
+    if not success
+        or not asset then
+
+        return nil
+
+    end
+
+    local sound =
+        Instance.new("Sound")
+
+    sound.SoundId =
+        asset
+
+    return sound
+
+end
+
+--========================================================--
+-- ROOM DETECTION
+--========================================================--
+
+function System:GetRoomNumber(room)
+
+    if not room then
+        return nil
+    end
+
+    return tonumber(
+        room.Name
+    )
+
+end
+
+function System:GetRoomFromPosition(
+    position
+)
+
+    local nearestRoom =
+        nil
+
+    local nearestDistance =
+        math.huge
+
+    for _, room in ipairs(
+        currentRooms:GetChildren()
+    ) do
+
+        if room:IsA("Model") then
+
+            local success,
+                roomCF =
+                pcall(function()
+
+                    local cf =
+                        room:GetBoundingBox()
+
+                    return cf
+
+                end)
+
+            if success
+                and roomCF then
+
+                local distance =
+                    (
+                        roomCF.Position
+                        - position
+                    ).Magnitude
+
+                if distance <
+                    nearestDistance then
+
+                    nearestDistance =
+                        distance
+
+                    nearestRoom =
+                        room
+
+                end
+
+            end
+
+        end
+
+    end
+
+    return nearestRoom
+
+end
+
+--========================================================--
+-- FADE ENDING
+--========================================================--
+
+function System:Ending()
+
+    local endingGui =
+        Instance.new("ScreenGui")
+
+    endingGui.Name =
+        "DeerGodEndingFade"
+
+    endingGui.IgnoreGuiInset =
+        true
+
+    endingGui.ResetOnSpawn =
+        false
+
+    endingGui.DisplayOrder =
+        2147483647
+
+    endingGui.Parent =
+        playerGui
+
+    local black =
+        Instance.new("Frame")
+
+    black.Size =
+        UDim2.fromScale(
+            1,
+            1
+        )
+
+    black.Position =
+        UDim2.fromScale(
+            0,
+            0
+        )
+
+    black.BackgroundColor3 =
+        Color3.new(
+            0,
+            0,
+            0
+        )
+
+    black.BackgroundTransparency =
+        1
+
+    black.BorderSizePixel =
+        0
+
+    black.ZIndex =
+        999999
+
+    black.Parent =
+        endingGui
+
+    local fadeIn =
+        TweenService:Create(
+
+            black,
+
+            TweenInfo.new(
+                Config.EndingFadeTime,
+                Enum.EasingStyle.Sine,
+                Enum.EasingDirection.InOut
+            ),
+
+            {
+                BackgroundTransparency =
+                    Config.EndingDarkness
+            }
+
+        )
+
+    fadeIn:Play()
+    fadeIn.Completed:Wait()
+
+    if not self.Active then
+        endingGui:Destroy()
+        return
+    end
+
+    local sound =
+        Instance.new("Sound")
+
+    sound.Name =
+        "DeerGodEndingSound"
+
+    sound.SoundId =
+        Config.EndSound
+
+    sound.Volume =
+        5
+
+    sound.Looped =
+        false
+
+    sound.Parent =
+        endingGui
+
+    sound:Play()
+
+    local ended =
+        false
+
+    local connection =
+        sound.Ended:Connect(function()
+
+            ended = true
+
+        end)
+
+    while not ended do
+        task.wait(0.05)
+    end
+
+    connection:Disconnect()
+
+    local fadeOut =
+        TweenService:Create(
+
+            black,
+
+            TweenInfo.new(
+                Config.EndingFadeTime,
+                Enum.EasingStyle.Sine,
+                Enum.EasingDirection.InOut
+            ),
+
+            {
+                BackgroundTransparency = 1
+            }
+
+        )
+
+    fadeOut:Play()
+    fadeOut.Completed:Wait()
+
+    sound:Destroy()
+    endingGui:Destroy()
+
+end
+
+return System
+--========================================================--
+--                 DEERGOD ENTITY                        --
+--========================================================--
+
+local RunService =
+    game:GetService("RunService")
+
+local ReplicatedStorage =
+    game:GetService("ReplicatedStorage")
+
+local System =
+    getgenv().DeerGodSystem
+
+local Config =
+    getgenv().DeerGodConfig
+
+--========================================================--
+-- LOAD FAKE MC
+--========================================================--
+
+task.spawn(function()
+
+    getgenv().OgHungerNewSpawner = nil
+
+    local success,
+        Spawner =
+        pcall(function()
+
+            return loadstring(
+                game:HttpGet(
+                    Config.FakeMCSpawnerURL
+                )
+            )()
+
+        end)
+
+    if not success
+        or not Spawner then
+
+        warn(
+            "FakeMC Spawner failed"
+        )
+
+        return
+
+    end
+
+    local entity =
+        Spawner:Create({
+
+            Entity = {
+
+                Name =
+                    "TempletfakeMc",
+
+                Asset =
+                    "rbxassetid://8233443894",
+
+                HeightOffset =
+                    2
+
+            },
+
+            Lights = {
+
+                Flicker = {
+
+                    Enabled =
+                        true,
+
+                    Duration =
+                        100
+
+                },
+
+                Shatter =
+                    true,
+
+                Repair =
+                    false
+
+            },
+
+            Earthquake = {
+
+                Enabled =
+                    true
+
+            },
+
+            Spawned = {
+
+                ChangeColorWhenSpawn =
+                    false,
+
+                Rainbow =
+                    false,
+
+                Color =
+                    Color3.fromRGB(
+                        0,
+                        85,
+                        255
+                    )
+
+            },
+
+            CameraShake = {
+
+                Enabled =
+                    false,
+
+                Range =
+                    100,
+
+                Values = {
+
+                    1.5,
+                    20,
+                    0.1,
+                    1
+
+                }
+
+            },
+
+            Movement = {
+
+                Speed =
+                    9999,
+
+                Delay =
+                    5,
+
+                Reversed =
+                    false,
+
+                EndWhenEnterLatestRoom =
+                    true,
+
+                EndDelay =
+                    2.5,
+
+                ReboundMoving =
+                    false,
+
+                TweenSecond =
+                    1.5,
+
+                ReboundMoveStyle =
+                    false,
+
+                ReboundStyleTimes =
+                    3,
+
+                ReboundStyleSound =
+                    "rbxassetid://130994177179386",
+
+                ReboundStyleVolume =
+                    5
+
+            },
+
+            Jumpscare = {
+
+                Enabled =
+                    false,
+
+                Image1 =
+                    "rbxassetid://11253398403",
+
+                Image2 =
+                    "rbxassetid://12293509957",
+
+                Sound1 =
+                    "rbxassetid://0",
+
+                Sound2 =
+                    "rbxassetid://109582246349306",
+
+                Tease = {
+
+                    [1] = true,
+                    Min = 1,
+                    Max = 1
+
+                },
+
+                Flashing = {
+
+                    [1] = true,
+
+                    [2] =
+                        Color3.fromRGB(
+                            0,
+                            85,
+                            255
+                        )
+
+                },
+
+                Shake =
+                    true
+
+            },
+
+            Rebounding = {
+
+                Enabled =
+                    false,
+
+                Type =
+                    "Ambush",
+
+                Min = 1,
+                Max = 1,
+
+                Delay = 2
+
+            },
+
+            Damage = {
+
+                Enabled =
+                    false,
+
+                Range = 40,
+                Amount = 0,
+
+                IgnoreHiding =
+                    false,
+
+                JumpscareRipper = {
+
+                    Enabled =
+                        false,
+
+                    TargetPartName =
+                        "Ripe",
+
+                    AttachmentName =
+                        "ripe",
+
+                    ParticleName =
+                        "ParticleEmitter",
+
+                    ParticleTexture =
+                        "rbxassetid://12737595583",
+
+                    SoundUrl =
+                        "https://github.com/eoyoustme/back/raw/main/Kill_with_static.mp3",
+
+                    SlamSoundId =
+                        "rbxassetid://1837829565",
+
+                    EndSoundId =
+                        "rbxassetid://4988621968",
+
+                    Images = {
+
+                        "rbxassetid://8482795900",
+                        "rbxassetid://236542974",
+                        "rbxassetid://184251462",
+                        "rbxassetid://236777652"
+
+                    },
+
+                    FlashDuration =
+                        1.6
+
+                }
+
+            },
+
+            Crucifixion = {
+
+                Enabled =
+                    true,
+
+                Range =
+                    40,
+
+                Resist =
+                    false,
+
+                Break =
+                    true
+
+            },
+
+            Death = {
+
+                Type =
+                    "Guiding",
+
+                Hints = {
+
+                    "Death",
+                    "Hints",
+                    "Go",
+                    "Here"
+
+                },
+
+                Cause =
+                    "Ripper"
+
+            }
+
+        })
+
+    --====================================================--
+    -- KHÔNG TẠO SOUND FAKE MC
+    --====================================================--
+
+    entity:SetCallback(
+        "OnSpawned",
+        function()
+        end
+    )
+
+    entity:SetCallback(
+        "OnStartMoving",
+        function()
+        end
+    )
+
+    entity:SetCallback(
+        "OnEnterRoom",
+        function()
+        end
+    )
+
+    entity:SetCallback(
+        "OnLookAt",
+        function()
+        end
+    )
+
+    entity:SetCallback(
+        "OnRebounding",
+        function()
+        end
+    )
+
+    entity:SetCallback(
+        "EndWhenGO",
+        function()
+        end
+    )
+
+    entity:SetCallback(
+        "OnDespawning",
+        function()
+        end
+    )
+
+    entity:SetCallback(
+        "OnDespawned",
+        function()
+        end
+    )
+
+    entity:SetCallback(
+        "OnDamagePlayer",
+        function()
+        end
+    )
+
+    entity:Run(true)
+
+end)
+
+--========================================================--
+-- LOAD DEERGOD
+--========================================================--
+
+local success,
+    deergod =
+    pcall(function()
+
+        return game:GetObjects(
+            Config.DeerGodAsset
+        )[1]
+
+    end)
+
+if not success
+    or not deergod then
+
+    warn(
+        "DeerGod failed to load"
+    )
+
+    return
+
+end
+
+System.DeerGod =
+    deergod
+
+deergod.Parent =
+    workspace
+
+deergod.Name =
+    "DeerGod"
+
+local basepart =
+    deergod:FindFirstChildWhichIsA(
+        "BasePart",
+        true
+    )
+
+if not basepart then
+
+    deergod:Destroy()
+
+    return
+
+end
+
+System.BasePart =
+    basepart
+
+--========================================================--
+-- REMOVE DEERGOD SOUNDS
+--========================================================--
+
+for _, obj in ipairs(
+    deergod:GetDescendants()
+) do
+
+    if obj:IsA("Sound") then
+
+        obj.Playing =
+            false
+
+    end
+
+end
+
+--========================================================--
+-- INITIAL ROOM
+--========================================================--
+
+local rooms =
+    workspace.CurrentRooms:GetChildren()
+
+local room =
+    rooms[
+        math.max(
+            1,
+            #rooms - 1
+        )
+    ]
+
+if room then
+
+    local parts =
+        room:FindFirstChild("Parts")
+
+    local floor =
+        parts
+        and parts:FindFirstChild("Floor")
+
+    if floor then
+
+        deergod:PivotTo(
+
+            floor.CFrame
+            + Vector3.new(
+                0,
+                4,
+                0
+            )
+
+        )
+
+    end
+
+end
+
+--========================================================--
+-- PHÁ ĐỒ THEO DEERGOD ROOM
+--========================================================--
+
+task.spawn(function()
+
+    while System.Active
+        and deergod
+        and deergod.Parent
+        and basepart
+        and basepart.Parent do
+
+        task.wait(0.1)
+
+        local deerRoom =
+            System:GetRoomFromPosition(
+                basepart.Position
+            )
+
+        if deerRoom then
+
+            local number =
+                System:GetRoomNumber(
+                    deerRoom
+                )
+
+            if number then
+
+                if not System.LastRoom then
+
+                    System.LastRoom =
+                        number
+
+                    -- Phá ngay phòng đầu tiên DeerGod đứng
+                    if not System.TriggeredRooms[number] then
+
+                        System.TriggeredRooms[number] =
+                            true
+
+                        task.spawn(function()
+
+                            pcall(function()
+
+                                loadstring(
+                                    game:HttpGet(
+                                        Config.BreakScriptURL
+                                    )
+                                )()
+
+                            end)
+
+                        end)
+
+                    end
+
+                elseif number ~=
+                    System.LastRoom then
+
+                    -- DeerGod thực sự sang phòng mới
+                    System.LastRoom =
+                        number
+
+                    if not System.TriggeredRooms[number] then
+
+                        System.TriggeredRooms[number] =
+                            true
+
+                        task.spawn(function()
+
+                            local ok,
+                                err =
+                                pcall(function()
+
+                                    loadstring(
+                                        game:HttpGet(
+                                            Config.BreakScriptURL
+                                        )
+                                    )()
+
+                                end)
+
+                            if not ok then
+
+                                warn(
+                                    "Phá đồ room "
+                                    .. tostring(number)
+                                    .. " failed: "
+                                    .. tostring(err)
+                                )
+
+                            end
+
+                        end)
+
+                    end
+
+                end
+
+            end
+
+        end
+
+    end
+
+end)
+
+--========================================================--
+-- CAMERA SHAKER
+--========================================================--
+
+local CameraShaker
+
+pcall(function()
+
+    CameraShaker =
+        require(
+            ReplicatedStorage:
+            WaitForChild(
+                "CameraShaker"
+            )
+        )
+
+end)
+
+if CameraShaker then
+
+    local camera =
+        workspace.CurrentCamera
+
+    System.Shake =
+        CameraShaker.new(
+
+            Enum.RenderPriority.Camera.Value,
+
+            function(cf)
+
+                if camera then
+
+                    camera.CFrame =
+                        camera.CFrame
+                        * cf
+
+                end
+
+            end
+
+        )
+
+    System.Shake:Start()
+
+end
+
+task.spawn(function()
+
+    while System.Active do
+
+        if System.Shake then
+
+            pcall(function()
+
+                System.Shake:ShakeOnce(
+
+                    50,
+                    50,
+                    0.05,
+                    0.45,
+                    0,
+                    0.8
+
+                )
+
+            end)
+
+        end
+
+        task.wait(1)
+
+    end
+
+end)
+
+--========================================================--
+-- MUSIC
+--========================================================--
+
+System.Lord =
+    System:GetGitSound(
+        Config.GitMusicURL,
+        Config.GitMusicName
+    )
+
+if System.Lord then
+
+    System.Lord.Parent =
+        workspace
+
+    System.Lord.Volume =
+        3
+
+    System.Lord.PlaybackSpeed =
+        1
+
+    System.Lord.Looped =
+        true
+
+    System.Lord:Play()
+
+end
+
+--========================================================--
+-- DEERGOD FOLLOW
+--========================================================--
+
+System.Connection =
+    RunService.RenderStepped:Connect(
+
+        function(dt)
+
+            if not System.Active
+                or not deergod
+                or not deergod.Parent
+                or not basepart
+                or not basepart.Parent then
+
+                return
+
+            end
+
+            local hrp =
+                System.Character:
+                FindFirstChild(
+                    "HumanoidRootPart"
+                )
+
+            if not hrp then
+                return
+            end
+
+            local currentPos =
+                basepart.Position
+
+            local targetPos =
+                hrp.Position
+
+            local difference =
+                targetPos
+                - currentPos
+
+            local distance =
+                difference.Magnitude
+
+            if distance > 0.5 then
+
+                local direction =
+                    difference.Unit
+
+                local newPos =
+                    currentPos
+                    + direction
+                    * Config.DeerGodSpeed
+                    * dt
+
+                local lookTarget =
+                    Vector3.new(
+                        targetPos.X,
+                        newPos.Y,
+                        targetPos.Z
+                    )
+
+                if (
+                    lookTarget
+                    - newPos
+                ).Magnitude > 0.001 then
+
+                    deergod:PivotTo(
+
+                        CFrame.lookAt(
+                            newPos,
+                            lookTarget
+                        )
+
+                    )
+
+                end
+
+            end
+
+        end
+
+    )
+
+--========================================================--
+-- DAMAGE
+--========================================================--
+
+task.spawn(function()
+
+    while System.Active do
+
+        task.wait(0.1)
+
+        if not basepart
+            or not basepart.Parent then
+
+            break
+
+        end
+
+        local hrp =
+            System.Character:
+            FindFirstChild(
+                "HumanoidRootPart"
+            )
+
+        local humanoid =
+            System.Character:
+            FindFirstChildOfClass(
+                "Humanoid"
+            )
+
+        if hrp and humanoid then
+
+            local distance =
+                (
+                    hrp.Position
+                    - basepart.Position
+                ).Magnitude
+
+            if distance < 9 then
+
+                humanoid.Health =
+                    0
+
+            end
+
+        end
+
+    end
+
+end)
+
+--========================================================--
+-- JUMPSCARE
+--========================================================--
+
+task.spawn(function()
+
+    local gui =
+        Instance.new("ScreenGui")
+
+    gui.Name =
+        "JumpscareOverlay"
+
+    gui.IgnoreGuiInset =
+        true
+
+    gui.ResetOnSpawn =
+        false
+
+    gui.DisplayOrder =
+        999999
+
+    gui.Parent =
+        playerGui
+
+    System.ScreenGui =
+        gui
+
+    local image =
+        Instance.new("ImageLabel")
+
+    image.Size =
+        UDim2.fromScale(
+            1,
+            1
+        )
+
+    image.Position =
+        UDim2.fromScale(
+            0,
+            0
+        )
+
+    image.BackgroundTransparency =
+        1
+
+    image.BorderSizePixel =
+        0
+
+    image.ScaleType =
+        Enum.ScaleType.Stretch
+
+    image.Parent =
+        gui
+
+    while System.Active
+        and gui.Parent do
+
+        for _, id in ipairs(
+            Config.JumpscareImages
+        ) do
+
+            if not System.Active then
+                break
+            end
+
+            image.Image =
+                id
+
+            image.ImageTransparency =
+                math.random(
+                    60,
+                    90
+                ) / 100
+
+            task.wait(
+                0.06
+            )
+
+        end
+
+    end
+
+end)
+
+--========================================================--
+-- RUN TEXT
+--========================================================--
+
+task.spawn(function()
+
+    local warning =
+        false
+
+    local index =
+        1
+
+    while System.Active do
+
+        task.wait(
+            0.025
+        )
+
+        if not basepart
+            or not basepart.Parent then
+
+            break
+
+        end
+
+        local hrp =
+            System.Character:
+            FindFirstChild(
+                "HumanoidRootPart"
+            )
+
+        if hrp then
+
+            local distance =
+                (
+                    hrp.Position
+                    - basepart.Position
+                ).Magnitude
+
+            if distance < 50 then
+
+                warning =
+                    true
+
+                if System.Caption then
+
+                    System.Caption.Font =
+                        Config.AntiqueFont
+
+                    System.Caption.Visible =
+                        true
+
+                    System.Caption.TextTransparency =
+                        0
+
+                    System.Caption.Text =
+                        Config.RunTexts[index]
+
+                end
+
+                index += 1
+
+                if index >
+                    #Config.RunTexts then
+
+                    index = 1
+
+                end
+
+            else
+
+                if warning then
+
+                    warning =
+                        false
+
+                    if System.Caption then
+
+                        System.Caption.Text =
+                            ""
+
+                        System.Caption.TextTransparency =
+                            1
+
+                        System.Caption.Visible =
+                            false
+
+                    end
+
+                end
+
+            end
+
+        end
+
+    end
+
+end)
+
+return true
+--========================================================--
+--                    DEERGOD MAIN                       --
+--========================================================--
+
+local ConfigURL =
+    "YOUR_RAW_URL/DeerGod_Config"
+
+local CoreURL =
+    "YOUR_RAW_URL/DeerGod_Core"
+
+local EntityURL =
+    "YOUR_RAW_URL/DeerGod_Entity"
+
+--========================================================--
+-- LOAD CONFIG
+--========================================================--
+
+local successConfig,
+    Config =
+    pcall(function()
+
+        return loadstring(
+            game:HttpGet(
+                ConfigURL
+            )
+        )()
+
+    end)
+
+if not successConfig
+    or not Config then
+
+    warn(
+        "DeerGod Config failed"
+    )
+
+    return
+
+end
+
+getgenv().DeerGodConfig =
+    Config
+
+--========================================================--
+-- LOAD CORE
+--========================================================--
+
+local successCore,
+    Core =
+    pcall(function()
+
+        return loadstring(
+            game:HttpGet(
+                CoreURL
+            )
+        )()
+
+    end)
+
+if not successCore
+    or not Core then
+
+    warn(
+        "DeerGod Core failed"
+    )
+
+    return
+
+end
+
+getgenv().DeerGodSystem =
+    Core
+
+--========================================================--
+-- INTRO
+--========================================================--
+
+local dialogs = {
+
+    "Let's play chasing...child..",
+
+    "Let's play hide and seek..",
+
+    "You better RUN",
+
+    "You might to run or hide..",
+
+    "Wanna Play?"
+
+}
+
+local caption =
+    Core.Caption
+
+local chosen =
+    dialogs[
+        math.random(
+            1,
+            #dialogs
+        )
+    ]
+
+Core:TypeText(
+    chosen,
+    0.045
+)
+
+task.wait(1)
+
+if caption then
+
+    Core:StopTyping()
+
+    local fade =
+        game:GetService(
+            "TweenService"
+        ):Create(
+
+            caption,
+
+            TweenInfo.new(
+                1,
+                Enum.EasingStyle.Sine,
+                Enum.EasingDirection.InOut
+            ),
+
+            {
+                TextTransparency = 1
+            }
+
+        )
+
+    fade:Play()
+    fade.Completed:Wait()
+
+end
+
+task.wait(0.2)
+
+--========================================================--
+-- COUNTDOWN 10 → 1
+--========================================================--
+
+local number = 10
+
+while number > 1
+    and Core.Active do
+
+    if caption then
+
+        caption.Font =
+            Config.AntiqueFont
+
+        caption.Visible =
+            true
+
+        caption.TextTransparency =
+            0
+
+        caption.Text =
+            tostring(number)
+
+    end
+
+    task.wait(1)
+
+    number -= 1
+
+end
+
+--========================================================--
+-- 1
+--========================================================--
+
+if number == 1
+    and Core.Active then
+
+    if caption then
+
+        caption.Font =
+            Config.AntiqueFont
+
+        caption.Visible =
+            true
+
+        caption.TextTransparency =
+            0
+
+        caption.Text =
+            "1"
+
+    end
+
+    task.wait(1)
+
+    -- SỐ 1 BIẾN MẤT
+    if caption then
+
+        caption.Text =
+            ""
+
+        caption.TextTransparency =
+            1
+
+        caption.Visible =
+            false
+
+    end
+
+    number = 0
+
+end
+
+--========================================================--
+-- START DEERGOD
+--========================================================--
+
+if number == 0
+    and Core.Active then
+
+    local successEntity,
+        err =
+        pcall(function()
+
+            loadstring(
+                game:HttpGet(
+                    EntityURL
+                )
+            )()
+
+        end)
+
+    if not successEntity then
+
+        warn(
+            "DeerGod Entity failed: "
+            .. tostring(err)
+        )
+
+    end
+
+end
+
+--========================================================--
+-- WAIT DEERGOD
+--========================================================--
+
+task.wait(
+    Config.DeerGodDuration
+)
+
+--========================================================--
+-- STOP EVERYTHING
+--========================================================--
+
+Core.Active =
+    false
+
+Core:StopTyping()
+
+--========================================================--
+-- STOP CAMERA
+--========================================================--
+
+if Core.Shake then
+
+    pcall(function()
+
+        Core.Shake:Stop()
+
+    end)
+
+end
+
+--========================================================--
+-- DISCONNECT
+--========================================================--
+
+if Core.Connection then
+
+    pcall(function()
+
+        Core.Connection:Disconnect()
+
+    end)
+
+    Core.Connection =
+        nil
+
+end
+
+--========================================================--
+-- STOP MUSIC
+--========================================================--
+
+if Core.Lord then
+
+    pcall(function()
+
+        Core.Lord:Stop()
+        Core.Lord:Destroy()
+
+    end)
+
+    Core.Lord =
+        nil
+
+end
+
+--========================================================--
+-- REMOVE JUMPSCARE
+--========================================================--
+
+if Core.ScreenGui then
+
+    pcall(function()
+
+        Core.ScreenGui:Destroy()
+
+    end)
+
+    Core.ScreenGui =
+        nil
+
+end
+
+--========================================================--
+-- CLEAR CAPTION
+--========================================================--
+
+if caption then
+
+    caption.Text =
+        ""
+
+    caption.TextTransparency =
+        1
+
+    caption.Visible =
+        false
+
+end
+
+--========================================================--
+-- REMOVE DEERGOD
+--========================================================--
+
+if Core.DeerGod then
+
+    pcall(function()
+
+        Core.DeerGod:Destroy()
+
+    end)
+
+    Core.DeerGod =
+        nil
+
+end
+
+Core.BasePart =
+    nil
+
+--========================================================--
+-- ENDING
+--========================================================--
+
+Core:Ending()
+
+--========================================================--
+-- DONE
+--========================================================--
+
+getgenv().DeerGodSystem =
+    nil
+
+getgenv().DeerGodConfig =
+    nil
