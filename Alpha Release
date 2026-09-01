@@ -1,0 +1,215 @@
+local mayhemInit = game.Workspace:FindFirstChild("HardcoreInit")
+
+
+if mayhemInit and mayhemInit.Value == true then
+	return
+end
+
+if not mayhemInit then
+	mayhemInit = Instance.new("BoolValue")
+	mayhemInit.Name = "HardcoreInit" 
+	mayhemInit.Value = true
+	mayhemInit.Parent = game.Workspace
+else
+	mayhemInit.Value = true
+end
+
+require(game.Players.LocalPlayer.PlayerGui.MainUI.Initiator.Main_Game).caption("Con Cu Carr dai vl", true)
+
+game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local gameData = ReplicatedStorage:WaitForChild("GameData", 10)
+
+local seed = 12345
+if gameData then
+	local seedVal = gameData:FindFirstChild("GameSeed")
+	if seedVal and seedVal:IsA("ValueBase") then
+		seed = seedVal.Value
+	elseif gameData:GetAttribute("GameSeed") then
+		seed = gameData:GetAttribute("GameSeed")
+	end
+end
+
+local entityList = {
+	{ name = "Rebound", url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Bla2", chance = 5.5 },
+	{ name = "Silence",       url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Hardcore-Retake/refs/heads/main/Silence%20Retake",       chance = 10 },
+	{ name = "CEASE",      url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Is%20hard",      chance = 17 },
+	{ name = "Deergod",    url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/67",  chance = 3.9 },
+	{ name = "Ripper",    url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Rippers",  chance = 14 },
+	{ name = "Monoxide", url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Hardcore-Retake/refs/heads/main/Monoxide%20Retake", chance = 0.25}
+}
+
+task.spawn(function()
+	while true do
+		wait(math.random(8,45))
+		local Players = game:GetService("Players")
+		local Workspace = game:GetService("Workspace")
+		local TweenService = game:GetService("TweenService")
+		local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+		local player = Players.LocalPlayer
+		local character = player.Character or player.CharacterAdded:Wait()
+
+		-- Biáº¿n kiá»ƒm tra Ä‘á»ƒ Ä‘áº£m báº£o chá»‰ nháº­n thĂ nh tá»±u 1 láº§n duy nháº¥t
+		local hasGottenAchievement = false 
+
+		local function spawnShocker()
+			-- Cáº­p nháº­t láº¡i character vĂ  humanoid má»—i khi spawn Ä‘á»ƒ trĂ¡nh lá»—i khi ngÆ°á»i chÆ¡i reset/cháº¿t
+			character = player.Character or player.CharacterAdded:Wait()
+			local humanoid = character:WaitForChild("Humanoid")
+
+			local shockerModel = game:GetObjects("rbxassetid://16167846540")[1]
+			local camera = Workspace.CurrentCamera
+
+			local rootPart = shockerModel:FindFirstChild("HumanoidRootPart") or shockerModel:FindFirstChildWhichIsA("Part")
+			shockerModel.PrimaryPart = rootPart
+			shockerModel:SetPrimaryPartCFrame(camera.CFrame * CFrame.new(0, 0, -7))
+			shockerModel.Parent = Workspace
+
+			local oogaBoogaaPart = shockerModel:WaitForChild("OOGA BOOGAAAA")
+			local horrorScream = oogaBoogaaPart:WaitForChild("HORROR SCREAM 15")
+			local boneSound = oogaBoogaaPart:FindFirstChild("Bone")
+
+			local lookDuration = 2
+			local lookStart = nil
+			local hasTriggered = false
+			local hasFallen = false
+
+			local function fallToGround()
+				if hasFallen then return end
+				hasFallen = true
+
+				oogaBoogaaPart.Anchored = false
+				oogaBoogaaPart.CanCollide = false
+
+				task.delay(1.2, function()
+					if shockerModel then
+						shockerModel:Destroy()
+					end
+				end)
+			end
+
+			local connection
+			connection = game:GetService("RunService").RenderStepped:Connect(function()
+				if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+				if hasTriggered then connection:Disconnect() return end
+
+				local directionToShocker = (oogaBoogaaPart.Position - camera.CFrame.Position).Unit
+				local playerLookVector = camera.CFrame.LookVector
+				local dot = directionToShocker:Dot(playerLookVector)
+
+				if dot > 0.85 then
+					if not lookStart then
+						lookStart = tick()
+					elseif tick() - lookStart >= lookDuration then
+						hasTriggered = true
+						connection:Disconnect()
+
+						horrorScream:Play()
+						if boneSound then boneSound:Play() end
+						humanoid:TakeDamage(30)
+
+						local targetPos = character.HumanoidRootPart.Position + Vector3.new(0, 2, 0)
+						local tweenInfo = TweenInfo.new(1.2, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+						local tween = TweenService:Create(oogaBoogaaPart, tweenInfo, {Position = targetPos})
+						tween:Play()
+
+						tween.Completed:Connect(function()
+							fallToGround()
+						end)
+
+						-- Death message
+						ReplicatedStorage.GameStats["Player_".. player.Name].Total.DeathCause.Value = "Shocker"
+						firesignal(ReplicatedStorage.RemotesFolder.DeathHint.OnClientEvent, {
+							"You died to who you call Shocker...",
+							"Don't look at it or it stuns you!"
+						}, "Blue")
+					end
+				else
+					connection:Disconnect()
+					fallToGround()
+				end
+			end)
+
+			task.delay(5, function()
+				if not hasTriggered and not hasFallen then
+					fallToGround()
+				end
+			end)
+
+			-- Achievement (Chá»‰ cháº¡y 1 láº§n)
+			if not hasGottenAchievement then
+				hasGottenAchievement = true
+				local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
+				achievementGiver({
+					Title = "Shocking Experience",
+					Desc = "Look at me.",
+					Reason = "Encounter Shocker.",
+					Image = "rbxassetid://17857830685"
+				})
+			end
+		end
+
+		spawnShocker()
+	end
+end)
+
+local function spawnEntity(entityData)
+	pcall(function()
+		loadstring(game:HttpGet(entityData.url))()
+	end)
+end
+
+local function IsSeekActive()
+	if workspace:FindFirstChild("SeekMoving") or workspace:FindFirstChild("SeekMovingNewClone") then
+		return true
+	end
+
+	local currentRooms = workspace:FindFirstChild("CurrentRooms")
+	if currentRooms then
+		for _, room in ipairs(currentRooms:GetChildren()) do
+			if room:FindFirstChild("SeekFolder") then
+				return true
+			end
+		end
+	end
+
+	return false
+end
+
+local checkedRooms = {}
+
+local function checkAndSpawnEntity(roomNum)
+	if IsSeekActive() then return end
+	if checkedRooms[roomNum] then return end
+	checkedRooms[roomNum] = true
+
+	for idx, entityData in ipairs(entityList) do
+		local spawnDelay = 8
+		task.wait(spawnDelay)
+		local roomRNG = Random.new(seed + (roomNum * 1337) + (idx * 42))
+		local roll = roomRNG:NextNumber(0, 100)
+
+		local currentChance = entityData.chance
+
+		if roll <= currentChance then
+			task.spawn(function()
+
+				if not IsSeekActive() then
+					spawnEntity(entityData)
+				end
+			end)
+		end
+	end
+end
+
+if gameData and gameData:FindFirstChild("LatestRoom") then
+	gameData.LatestRoom.Changed:Connect(function(newRoom)
+		checkAndSpawnEntity(newRoom)
+	end)
+
+	if gameData.LatestRoom.Value > 0 then
+		checkAndSpawnEntity(gameData.LatestRoom.Value)
+	end
+end
