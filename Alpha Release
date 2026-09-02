@@ -32,12 +32,12 @@ if gameData then
 end
 
 local entityList = {
-	{ name = "Rebound", url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Bla2", chance = 5.5 },
+	{ name = "Rebound", url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Bla2", chance = 3.8 },
 	{ name = "Silence",       url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Hardcore-Retake/refs/heads/main/Silence%20Retake",       chance = 10 },
 	{ name = "CEASE",      url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Is%20hard",      chance = 17 },
 	{ name = "Deergod",    url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/67",  chance = 3.9 },
 	{ name = "Ripper",    url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Rippers",  chance = 14 },
-	{ name = "Monoxide", url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Hardcore-Retake/refs/heads/main/Monoxide%20Retake", chance = 0.25}
+	{ name = "Monoxide", url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Hardcore-Retake/refs/heads/main/Monoxide%20Retake", chance = 0.98}
 }
 
 task.spawn(function()
