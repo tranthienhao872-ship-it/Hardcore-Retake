@@ -21,7 +21,7 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 -- SETTINGS
 --========================================================--
 
-local RIPPER_CHANCE = 16
+local RIPPER_CHANCE = 10.2
 
 local ripperActive = false
 local achievementEarned = false
@@ -330,7 +330,7 @@ local function SpawnRipper()
 
 			Entity = {
 				Name = "Ripper Entity",
-				Asset = "16167844072",
+				Asset = "89134303045466",
 				HeightOffset = 0
 			},
 
