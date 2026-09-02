@@ -357,7 +357,7 @@ local function SpawnRipper()
 			CameraShake = {
 				Enabled = true,
 				Range = 100,
-				Values = {1.5, 40, 0.1, 1}
+				Values = {20, 40, 0.9, 1}
 			},
 
 			Movement = {
