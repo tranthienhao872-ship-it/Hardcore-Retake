@@ -1,0 +1,188 @@
+-- LocalScript: đặt trong StarterPlayer > StarterPlayerScripts
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+
+-- ===== cặc =====
+local NORMAL_SPEED = 16
+local SPRINT_SPEED = 18
+local EXHAUSTED_SPEED = 12 -- tốc độ khi đang trong thời gian chờ hồi (hết stamina)
+local MAX_STAMINA = 100
+local DRAIN_RATE = 20   -- mỗi giây khi sprint
+local REGEN_RATE = 15   -- mỗi giây khi không sprint
+local MIN_STAMINA_TO_SPRINT = 5
+
+local EXHAUST_COOLDOWN = 2.5   -- thời gian chờ sau khi hết stamina mới bắt đầu hồi
+local DARKEN_TRANSPARENCY = 0.75 -- độ tối màn hình (0 = tối hoàn toàn, 1 = trong suốt) -> để ít tối thì để gần 1
+local DARKEN_TWEEN_TIME = 0.4
+
+local currentStamina = MAX_STAMINA
+local isSprinting = false
+local isExhausted = false
+local exhaustCooldownTimer = 0
+
+-- ===== ÂM THANH HẾT STAMINA =====
+local exhaustSound = Instance.new("Sound")
+exhaustSound.Name = "ExhaustSound"
+exhaustSound.SoundId = "rbxassetid://101395573137763"
+exhaustSound.Volume = 1
+exhaustSound.Parent = player:WaitForChild("PlayerGui")
+
+-- ===== TẠO UI =====
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "StaminaGui"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true -- để overlay phủ hết màn hình, kể cả vùng dưới topbar
+screenGui.DisplayOrder = 999 -- đảm bảo lớp tối nằm trên cùng
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Overlay tối màn hình khi hết stamina
+local darkOverlay = Instance.new("Frame")
+darkOverlay.Name = "DarkOverlay"
+darkOverlay.Size = UDim2.new(1, 0, 1, 0)
+darkOverlay.Position = UDim2.new(0, 0, 0, 0)
+darkOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+darkOverlay.BackgroundTransparency = 1 -- ban đầu trong suốt (không tối)
+darkOverlay.BorderSizePixel = 0
+darkOverlay.ZIndex = 0
+darkOverlay.Parent = screenGui
+
+-- Nền thanh stamina (outline xanh dương)
+local barBackground = Instance.new("Frame")
+barBackground.Name = "StaminaBackground"
+barBackground.Size = UDim2.new(0, 170, 0, 16)
+barBackground.Position = UDim2.new(1, -190, 0, 105) -- góc phải, xích xuống
+barBackground.BackgroundColor3 = Color3.fromRGB(13, 71, 161) -- xanh đậm
+barBackground.BorderSizePixel = 0
+barBackground.Parent = screenGui
+
+local outline = Instance.new("UIStroke")
+outline.Color = Color3.fromRGB(13, 71, 161) -- xanh dương đậm
+outline.Thickness = 2
+outline.Parent = barBackground
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 6)
+corner.Parent = barBackground
+
+-- Thanh fill bên trong
+local barFill = Instance.new("Frame")
+barFill.Name = "StaminaFill"
+barFill.Size = UDim2.new(1, 0, 1, 0)
+barFill.BackgroundColor3 = Color3.fromRGB(30, 144, 255) -- xanh dương
+barFill.BorderSizePixel = 0
+barFill.Parent = barBackground
+
+local fillCorner = Instance.new("UICorner")
+fillCorner.CornerRadius = UDim.new(0, 6)
+fillCorner.Parent = barFill
+
+-- Nút Sprint (nằm trên thanh bar)
+local sprintButton = Instance.new("TextButton")
+sprintButton.Name = "SprintButton"
+sprintButton.Size = UDim2.new(0, 170, 0, 34)
+sprintButton.Position = UDim2.new(1, -190, 0, 63) -- trên thanh bar, xích xuống
+sprintButton.Text = "SPRINT"
+sprintButton.TextScaled = false
+sprintButton.TextSize = 14
+sprintButton.Font = Enum.Font.GothamBold
+sprintButton.BackgroundColor3 = Color3.fromRGB(30, 144, 255) -- xanh dương
+sprintButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+sprintButton.Parent = screenGui
+
+local buttonCorner = Instance.new("UICorner")
+buttonCorner.CornerRadius = UDim.new(0, 6)
+buttonCorner.Parent = sprintButton
+
+-- ===== HÀM TỐI / SÁNG MÀN HÌNH =====
+local function setScreenDarkened(darkened)
+	local targetTransparency = darkened and DARKEN_TRANSPARENCY or 1
+	local tween = TweenService:Create(
+		darkOverlay,
+		TweenInfo.new(DARKEN_TWEEN_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+		{ BackgroundTransparency = targetTransparency }
+	)
+	tween:Play()
+end
+
+-- ===== LOGIC SPRINT =====
+local function toggleSprint()
+	if isExhausted then
+		return -- đang trong thời gian chờ hồi, không cho sprint lại
+	end
+
+	if not isSprinting then
+		if currentStamina > MIN_STAMINA_TO_SPRINT then
+			isSprinting = true
+			humanoid.WalkSpeed = SPRINT_SPEED
+			sprintButton.BackgroundColor3 = Color3.fromRGB(13, 71, 161) -- xanh đậm khi đang sprint
+		end
+	else
+		isSprinting = false
+		humanoid.WalkSpeed = NORMAL_SPEED
+		sprintButton.BackgroundColor3 = Color3.fromRGB(30, 144, 255) -- xanh dương khi không sprint
+	end
+end
+
+sprintButton.MouseButton1Click:Connect(toggleSprint)
+
+-- Hỗ trợ nhấn phím Space để sprint trên máy tính
+UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+	if gameProcessedEvent then return end -- bỏ qua nếu đang gõ chat, v.v.
+	if input.KeyCode == Enum.KeyCode.Space then
+		toggleSprint()
+	end
+end)
+
+-- ===== LOGIC STAMINA =====
+RunService.Heartbeat:Connect(function(dt)
+	if isSprinting then
+		currentStamina -= DRAIN_RATE * dt
+		if currentStamina <= 0 then
+			currentStamina = 0
+			isSprinting = false
+			isExhausted = true
+			exhaustCooldownTimer = EXHAUST_COOLDOWN
+			humanoid.WalkSpeed = EXHAUSTED_SPEED
+			sprintButton.BackgroundColor3 = Color3.fromRGB(30, 144, 255) -- xanh dương khi không sprint
+
+			-- Phát âm thanh hết stamina
+			exhaustSound:Play()
+
+			-- Tối màn hình một chút
+			setScreenDarkened(true)
+		end
+	elseif isExhausted then
+		-- Đang chờ để bắt đầu hồi stamina
+		exhaustCooldownTimer -= dt
+		if exhaustCooldownTimer <= 0 then
+			isExhausted = false
+			humanoid.WalkSpeed = NORMAL_SPEED -- trở lại tốc độ bình thường khi hết thời gian chờ
+			setScreenDarkened(false) -- sáng lại màn hình khi bắt đầu hồi
+		end
+	else
+		currentStamina = math.min(MAX_STAMINA, currentStamina + REGEN_RATE * dt)
+	end
+
+	barFill.Size = UDim2.new(currentStamina / MAX_STAMINA, 0, 1, 0)
+end)
+
+-- Xử lý khi nhân vật respawn
+player.CharacterAdded:Connect(function(newCharacter)
+	character = newCharacter
+	humanoid = character:WaitForChild("Humanoid")
+	humanoid.WalkSpeed = NORMAL_SPEED
+	isSprinting = false
+	isExhausted = false
+	exhaustCooldownTimer = 0
+	currentStamina = MAX_STAMINA
+	setScreenDarkened(false)
+end)
+
+
