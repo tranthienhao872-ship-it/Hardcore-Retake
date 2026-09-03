@@ -1,6 +1,6 @@
 --========================================================--
---              DEEPNIES RANDOM DOOR SYSTEM              --
---                    DOORS / DELTA                       --
+--          DEEPNIES RANDOM OPEN DOOR SYSTEM             --
+--                  DOORS / DELTA                         --
 --========================================================--
 
 getgenv().DeepniesRandomSystem =
@@ -9,11 +9,11 @@ getgenv().DeepniesRandomSystem =
 local System = getgenv().DeepniesRandomSystem
 
 --========================================================--
--- ANTI DUPLICATE SYSTEM
+-- ANTI DUPLICATE
 --========================================================--
 
 if System.Running then
-    warn("[Deepnies Random] Already running.")
+    warn("[DEEPNIES RANDOM] Already running!")
     return
 end
 
@@ -28,9 +28,6 @@ local CHANCE = 18.8
 local SCRIPT_URL =
     "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Deepnies"
 
--- Mỗi phòng chỉ được roll đúng 1 lần
-local RolledRooms = {}
-
 --========================================================--
 -- SERVICES
 --========================================================--
@@ -43,341 +40,399 @@ local Player = Players.LocalPlayer
 -- VARIABLES
 --========================================================--
 
-local LastRoomNumber = nil
+local CurrentRooms
+local RoomConnection
+
 local Initialized = false
+local LastRoom = nil
+
+-- Phòng đã random
+local RolledRooms = {}
 
 --========================================================--
--- GET LATEST ROOM
+-- RANDOM SEED
 --========================================================--
 
-local function GetLatestRoomNumber()
+math.randomseed(
+    os.time() +
+    math.floor(os.clock() * 100000)
+)
 
-    local CurrentRooms =
+--========================================================--
+-- CONSOLE HEADER
+--========================================================--
+
+print("")
+print("==================================================")
+print("          DEEPNIES RANDOM OPEN DOOR")
+print("==================================================")
+print("[DEEPNIES RANDOM] Chance       : 18.8%")
+print("[DEEPNIES RANDOM] Initial      : OFF")
+print("[DEEPNIES RANDOM] Duplicate    : OFF")
+print("[DEEPNIES RANDOM] Trigger      : OPEN DOOR / NEW ROOM")
+print("[DEEPNIES RANDOM] Executor     : DELTA")
+print("==================================================")
+
+--========================================================--
+-- GET CURRENT ROOMS
+--========================================================--
+
+local function GetCurrentRooms()
+
+    local Rooms =
         workspace:FindFirstChild("CurrentRooms")
+
+    if not Rooms then
+        return nil
+    end
+
+    return Rooms
+end
+
+--========================================================--
+-- GET ROOM NUMBER
+--========================================================--
+
+local function GetRoomNumber(Room)
+
+    if not Room then
+        return nil
+    end
+
+    if not Room:IsA("Model") then
+        return nil
+    end
+
+    return tonumber(Room.Name)
+end
+
+--========================================================--
+-- GET HIGHEST ROOM
+--========================================================--
+
+local function GetHighestRoom()
 
     if not CurrentRooms then
         return nil
     end
 
-    local HighestRoom = nil
+    local Highest = nil
 
     for _, Room in ipairs(CurrentRooms:GetChildren()) do
 
-        if Room:IsA("Model") then
+        local Number =
+            GetRoomNumber(Room)
 
-            local Number = tonumber(Room.Name)
+        if Number then
 
-            if Number then
-
-                if not HighestRoom or Number > HighestRoom then
-                    HighestRoom = Number
-                end
-
+            if not Highest or Number > Highest then
+                Highest = Number
             end
 
         end
 
     end
 
-    return HighestRoom
+    return Highest
 end
 
 --========================================================--
--- RUN DEEPNIES
+-- ACTIVATE DEEPNIES
 --========================================================--
 
-local function RunDeepnies(RoomNumber)
+local function ActivateDeepnies(RoomNumber)
 
     if not RoomNumber then
         return
     end
 
-    -- Không cho random trùng
+    --====================================================--
+    -- DUPLICATE CHECK
+    --====================================================--
+
     if RolledRooms[RoomNumber] then
+
+        print(
+            "[DEEPNIES RANDOM] Room",
+            RoomNumber,
+            "already rolled -> SKIP"
+        )
+
         return
     end
 
+    -- Đánh dấu trước khi random
     RolledRooms[RoomNumber] = true
 
-    -- Random chính xác 18.8%
-    local Roll = math.random(1, 10000)
+    --====================================================--
+    -- RANDOM
+    --====================================================--
+
+    local Roll =
+        math.random(1, 10000)
+
+    local RollPercent =
+        Roll / 100
+
+    print("")
+    print("--------------------------------------------------")
+    print(
+        "[DEEPNIES RANDOM] NEW ROOM:",
+        RoomNumber
+    )
+
+    print(
+        "[DEEPNIES RANDOM] Random:",
+        string.format("%.2f%%", RollPercent)
+    )
+
+    print(
+        "[DEEPNIES RANDOM] Required:",
+        CHANCE .. "%"
+    )
+
+    --====================================================--
+    -- HIT
+    --====================================================--
 
     if Roll <= 1880 then
 
         print(
-            "[Deepnies Random] HIT!",
-            "| Room:",
-            RoomNumber,
-            "| Chance: 18.8%"
+            "[DEEPNIES RANDOM] >>> HIT <<<"
+        )
+
+        print(
+            "[DEEPNIES RANDOM] Activating Deepnies..."
         )
 
         task.spawn(function()
 
-            local Success, ErrorMessage =
+            local Success,
+                ErrorMessage =
                 pcall(function()
 
                     local Source =
                         game:HttpGet(SCRIPT_URL)
 
+                    print(
+                        "[DEEPNIES RANDOM] Script downloaded."
+                    )
+
                     local Loader =
                         loadstring(Source)
 
                     if not Loader then
-                        error("loadstring failed")
+                        error(
+                            "loadstring failed"
+                        )
                     end
 
                     Loader()
+
+                    print(
+                        "[DEEPNIES RANDOM] Deepnies executed!"
+                    )
 
                 end)
 
             if not Success then
 
                 warn(
-                    "[Deepnies Random] Failed:",
-                    ErrorMessage
+                    "[DEEPNIES RANDOM] SCRIPT ERROR:"
                 )
+
+                warn(ErrorMessage)
 
             end
 
         end)
 
+    --====================================================--
+    -- MISS
+    --====================================================--
+
     else
 
         print(
-            "[Deepnies Random] MISS",
-            "| Room:",
-            RoomNumber,
-            "| Chance: 18.8%"
+            "[DEEPNIES RANDOM] >>> MISS <<<"
+        )
+
+        print(
+            "[DEEPNIES RANDOM] No Deepnies this room."
+        )
+
+        print(
+            "[DEEPNIES RANDOM] Waiting for next door..."
         )
 
     end
+
+    print("--------------------------------------------------")
+
 end
 
 --========================================================--
--- ROOM MONITOR
+-- INITIALIZE
 --========================================================--
 
 task.spawn(function()
 
     --====================================================--
-    -- INITIALIZATION
+    -- WAIT FOR DOORS
     --====================================================--
-
-    task.wait(3)
-
-    local InitialRoom =
-        GetLatestRoomNumber()
-
-    if InitialRoom then
-
-        LastRoomNumber = InitialRoom
-        Initialized = true
-
-        -- QUAN TRỌNG:
-        -- Phòng hiện tại chỉ được ghi nhận.
-        -- KHÔNG RANDOM.
-        RolledRooms[InitialRoom] = true
-
-        print(
-            "[Deepnies Random] Initialized at Room:",
-            InitialRoom
-        )
-
-        print(
-            "[Deepnies Random] Initial spawn: OFF"
-        )
-
-    end
-
-    --====================================================--
-    -- WATCH NEW ROOMS
-    --====================================================--
-
-    while System.Running do
-
-        local CurrentRoom =
-            GetLatestRoomNumber()
-
-        if CurrentRoom then
-
-            if not Initialized then
-
-                -- Nếu lúc đầu CurrentRooms chưa load
-                LastRoomNumber = CurrentRoom
-                Initialized = true
-
-                RolledRooms[CurrentRoom] = true
-
-                print(
-                    "[Deepnies Random] Initial Room:",
-                    CurrentRoom
-                )
-
-            elseif CurrentRoom > LastRoomNumber then
-
-                -- Một hoặc nhiều room mới xuất hiện
-                for RoomNumber =
-                    LastRoomNumber + 1,
-                    CurrentRoom do
-
-                    -- Phòng mới = random đúng 1 lần
-                    RunDeepnies(RoomNumber)
-
-                end
-
-                LastRoomNumber = CurrentRoom
-
-            end
-
-        end
-
-        task.wait(0.1)
-
-    end
-
-end)
-
---========================================================--
--- STOP FUNCTION
---========================================================--
-
-System.Stop = function()
-
-    System.Running = false
-
-    table.clear(RolledRooms)
-
-    LastRoomNumber = nil
-    Initialized = false
 
     print(
-        "[Deepnies Random] System stopped."
+        "[DEEPNIES RANDOM] Waiting for CurrentRooms..."
     )
 
-end
+    local Timeout = 15
+    local StartTime = os.clock()
 
---========================================================--
--- INFO
---========================================================--
+    repeat
 
-print("==============================================")
-print("          DEEPNIES RANDOM DOOR SYSTEM")
-print("----------------------------------------------")
-print(" Chance per new room : 18.8%")
-print(" Initial room        : NO RANDOM")
-print(" Initial spawn       : OFF")
-print(" Duplicate roll      : OFF")
-print(" Random per room     : ON")
-print("==============================================")
-    if not RoomNumber then
+        CurrentRooms =
+            GetCurrentRooms()
+
+        if CurrentRooms then
+            break
+        end
+
+        task.wait(0.25)
+
+    until os.clock() - StartTime >= Timeout
+        or not System.Running
+
+    if not CurrentRooms then
+
+        warn(
+            "[DEEPNIES RANDOM] ERROR: CurrentRooms not found!"
+        )
+
+        System.Running = false
         return
     end
 
-    -- Không random trùng phòng
-    if RolledRooms[RoomNumber] then
-        return
-    end
+    print(
+        "[DEEPNIES RANDOM] CurrentRooms found."
+    )
 
-    RolledRooms[RoomNumber] = true
+    --====================================================--
+    -- MARK EVERY EXISTING ROOM
+    --====================================================--
 
-    local Roll = math.random(1, 10000)
-    local ChanceValue = math.floor(CHANCE * 100)
+    local HighestRoom =
+        GetHighestRoom()
 
-    -- 18.8% = 1880 / 10000
-    if Roll <= ChanceValue then
+    for _, Room in ipairs(CurrentRooms:GetChildren()) do
 
-        print(
-            "[Deepnies Random] HIT!",
-            "Room:",
-            RoomNumber,
-            "Chance:",
-            CHANCE .. "%"
-        )
+        local Number =
+            GetRoomNumber(Room)
 
-        task.spawn(function()
+        if Number then
 
-            local Success, ErrorMessage = pcall(function()
-
-                local Code = game:HttpGet(SCRIPT_URL)
-
-                local Loaded = loadstring(Code)
-
-                if not Loaded then
-                    error("loadstring failed")
-                end
-
-                Loaded()
-
-            end)
-
-            if not Success then
-
-                warn(
-                    "[Deepnies Random] ERROR:",
-                    ErrorMessage
-                )
-
-            end
-
-        end)
-
-    else
-
-        print(
-            "[Deepnies Random] MISS",
-            "Room:",
-            RoomNumber,
-            "Chance:",
-            CHANCE .. "%"
-        )
-
-    end
-end
-
---========================================================--
--- WATCH ROOM CHANGES
---========================================================--
-
-task.spawn(function()
-
-    -- Chờ game ổn định
-    task.wait(3)
-
-    while System.Running do
-
-        local CurrentRoom = GetCurrentRoomNumber()
-
-        if CurrentRoom then
-
-            -- Lần đầu tìm thấy phòng:
-            -- chỉ lưu phòng, KHÔNG random
-            if not Initialized then
-
-                LastRoom = CurrentRoom
-                Initialized = true
-
-                print(
-                    "[Deepnies Random] Initial room:",
-                    CurrentRoom,
-                    "| Random: OFF"
-                )
-
-            elseif CurrentRoom ~= LastRoom then
-
-                -- Sang phòng mới
-                LastRoom = CurrentRoom
-
-                -- Đợi room load hoàn tất
-                task.wait(0.2)
-
-                RandomDeepnies(CurrentRoom)
-
-            end
+            RolledRooms[Number] = true
 
         end
 
-        task.wait(0.1)
     end
+
+    LastRoom = HighestRoom
+
+    print(
+        "[DEEPNIES RANDOM] Current room:",
+        tostring(HighestRoom)
+    )
+
+    print(
+        "[DEEPNIES RANDOM] Existing rooms marked."
+    )
+
+    print(
+        "[DEEPNIES RANDOM] Initial random: OFF"
+    )
+
+    print(
+        "[DEEPNIES RANDOM] Initial Deepnies: OFF"
+    )
+
+    --====================================================--
+    -- IMPORTANT INITIALIZATION DELAY
+    --====================================================--
+
+    -- Chờ replication / loading ban đầu hoàn tất
+    task.wait(2)
+
+    if not System.Running then
+        return
+    end
+
+    Initialized = true
+
+    print("")
+    print("==================================================")
+    print("[DEEPNIES RANDOM] SYSTEM READY")
+    print("[DEEPNIES RANDOM] Waiting for OPEN DOOR...")
+    print("==================================================")
+
+    --====================================================--
+    -- WATCH NEW ROOM
+    --====================================================--
+
+    RoomConnection =
+        CurrentRooms.ChildAdded:Connect(function(Room)
+
+            if not System.Running then
+                return
+            end
+
+            -- Không xử lý trong initialization
+            if not Initialized then
+                return
+            end
+
+            local RoomNumber =
+                GetRoomNumber(Room)
+
+            if not RoomNumber then
+                return
+            end
+
+            -- Phòng cũ / đã xử lý
+            if RolledRooms[RoomNumber] then
+
+                print(
+                    "[DEEPNIES RANDOM] Existing room detected:",
+                    RoomNumber,
+                    "-> IGNORE"
+                )
+
+                return
+            end
+
+            --================================================--
+            -- NEW ROOM = DOOR WAS OPENED
+            --================================================--
+
+            print("")
+            print("##################################################")
+            print(
+                "[DEEPNIES RANDOM] NEW ROOM CREATED:",
+                RoomNumber
+            )
+            print(
+                "[DEEPNIES RANDOM] Door transition detected."
+            )
+            print("##################################################")
+
+            LastRoom = RoomNumber
+
+            -- Đợi room load một chút
+            task.wait(0.15)
+
+            -- Random đúng 1 lần
+            ActivateDeepnies(RoomNumber)
+
+        end)
 
 end)
 
@@ -388,22 +443,36 @@ end)
 System.Stop = function()
 
     System.Running = false
+    Initialized = false
+
+    if RoomConnection then
+
+        RoomConnection:Disconnect()
+        RoomConnection = nil
+
+    end
+
+    LastRoom = nil
 
     table.clear(RolledRooms)
 
-    print("[Deepnies Random] STOPPED")
+    print("")
+    print("==================================================")
+    print("[DEEPNIES RANDOM] SYSTEM STOPPED")
+    print("==================================================")
 
 end
 
 --========================================================--
--- INFO
+-- FINAL CONSOLE
 --========================================================--
 
-print("==============================================")
-print("       DEEPNIES RANDOM ROOM SYSTEM")
-print("----------------------------------------------")
-print(" Chance per room : 18.8%")
-print(" Initial random  : OFF")
-print(" Room duplicate  : OFF")
-print(" Random system   : ON")
-print("==============================================")
+print("")
+print("==================================================")
+print("[DEEPNIES RANDOM] LOADED")
+print("[DEEPNIES RANDOM] 18.8% per NEW ROOM")
+print("[DEEPNIES RANDOM] Initial spawn : OFF")
+print("[DEEPNIES RANDOM] Initial roll  : OFF")
+print("[DEEPNIES RANDOM] Duplicate     : OFF")
+print("[DEEPNIES RANDOM] Waiting...    ")
+print("==================================================")
