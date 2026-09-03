@@ -1,14 +1,19 @@
 --========================================================--
---             DEEPNIES RANDOM ROOM SYSTEM               --
---                  DOORS / DELTA                         --
+--              DEEPNIES RANDOM DOOR SYSTEM              --
+--                    DOORS / DELTA                       --
 --========================================================--
 
-getgenv().DeepniesRandomSystem = getgenv().DeepniesRandomSystem or {}
+getgenv().DeepniesRandomSystem =
+    getgenv().DeepniesRandomSystem or {}
 
 local System = getgenv().DeepniesRandomSystem
 
--- Chống chạy hệ thống nhiều lần
+--========================================================--
+-- ANTI DUPLICATE SYSTEM
+--========================================================--
+
 if System.Running then
+    warn("[Deepnies Random] Already running.")
     return
 end
 
@@ -19,10 +24,11 @@ System.Running = true
 --========================================================--
 
 local CHANCE = 18.8
+
 local SCRIPT_URL =
     "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Deepnies"
 
--- Phòng đã random
+-- Mỗi phòng chỉ được roll đúng 1 lần
 local RolledRooms = {}
 
 --========================================================--
@@ -34,38 +40,26 @@ local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 
 --========================================================--
--- ROOM DATA
+-- VARIABLES
 --========================================================--
 
-local LastRoom = nil
+local LastRoomNumber = nil
 local Initialized = false
 
 --========================================================--
--- GET CURRENT ROOM NUMBER
+-- GET LATEST ROOM
 --========================================================--
 
-local function GetCurrentRoomNumber()
+local function GetLatestRoomNumber()
 
-    local CurrentRooms = workspace:FindFirstChild("CurrentRooms")
+    local CurrentRooms =
+        workspace:FindFirstChild("CurrentRooms")
 
     if not CurrentRooms then
         return nil
     end
 
-    local Character = Player.Character
-
-    if not Character then
-        return nil
-    end
-
-    local Root = Character:FindFirstChild("HumanoidRootPart")
-
-    if not Root then
-        return nil
-    end
-
-    local ClosestRoom = nil
-    local ClosestDistance = math.huge
+    local HighestRoom = nil
 
     for _, Room in ipairs(CurrentRooms:GetChildren()) do
 
@@ -75,21 +69,8 @@ local function GetCurrentRoomNumber()
 
             if Number then
 
-                local Part = Room:FindFirstChildWhichIsA(
-                    "BasePart",
-                    true
-                )
-
-                if Part then
-
-                    local Distance =
-                        (Root.Position - Part.Position).Magnitude
-
-                    if Distance < ClosestDistance then
-                        ClosestDistance = Distance
-                        ClosestRoom = Number
-                    end
-
+                if not HighestRoom or Number > HighestRoom then
+                    HighestRoom = Number
                 end
 
             end
@@ -98,15 +79,196 @@ local function GetCurrentRoomNumber()
 
     end
 
-    return ClosestRoom
+    return HighestRoom
 end
 
 --========================================================--
--- RANDOM DEEPNIES
+-- RUN DEEPNIES
 --========================================================--
 
-local function RandomDeepnies(RoomNumber)
+local function RunDeepnies(RoomNumber)
 
+    if not RoomNumber then
+        return
+    end
+
+    -- Không cho random trùng
+    if RolledRooms[RoomNumber] then
+        return
+    end
+
+    RolledRooms[RoomNumber] = true
+
+    -- Random chính xác 18.8%
+    local Roll = math.random(1, 10000)
+
+    if Roll <= 1880 then
+
+        print(
+            "[Deepnies Random] HIT!",
+            "| Room:",
+            RoomNumber,
+            "| Chance: 18.8%"
+        )
+
+        task.spawn(function()
+
+            local Success, ErrorMessage =
+                pcall(function()
+
+                    local Source =
+                        game:HttpGet(SCRIPT_URL)
+
+                    local Loader =
+                        loadstring(Source)
+
+                    if not Loader then
+                        error("loadstring failed")
+                    end
+
+                    Loader()
+
+                end)
+
+            if not Success then
+
+                warn(
+                    "[Deepnies Random] Failed:",
+                    ErrorMessage
+                )
+
+            end
+
+        end)
+
+    else
+
+        print(
+            "[Deepnies Random] MISS",
+            "| Room:",
+            RoomNumber,
+            "| Chance: 18.8%"
+        )
+
+    end
+end
+
+--========================================================--
+-- ROOM MONITOR
+--========================================================--
+
+task.spawn(function()
+
+    --====================================================--
+    -- INITIALIZATION
+    --====================================================--
+
+    task.wait(3)
+
+    local InitialRoom =
+        GetLatestRoomNumber()
+
+    if InitialRoom then
+
+        LastRoomNumber = InitialRoom
+        Initialized = true
+
+        -- QUAN TRỌNG:
+        -- Phòng hiện tại chỉ được ghi nhận.
+        -- KHÔNG RANDOM.
+        RolledRooms[InitialRoom] = true
+
+        print(
+            "[Deepnies Random] Initialized at Room:",
+            InitialRoom
+        )
+
+        print(
+            "[Deepnies Random] Initial spawn: OFF"
+        )
+
+    end
+
+    --====================================================--
+    -- WATCH NEW ROOMS
+    --====================================================--
+
+    while System.Running do
+
+        local CurrentRoom =
+            GetLatestRoomNumber()
+
+        if CurrentRoom then
+
+            if not Initialized then
+
+                -- Nếu lúc đầu CurrentRooms chưa load
+                LastRoomNumber = CurrentRoom
+                Initialized = true
+
+                RolledRooms[CurrentRoom] = true
+
+                print(
+                    "[Deepnies Random] Initial Room:",
+                    CurrentRoom
+                )
+
+            elseif CurrentRoom > LastRoomNumber then
+
+                -- Một hoặc nhiều room mới xuất hiện
+                for RoomNumber =
+                    LastRoomNumber + 1,
+                    CurrentRoom do
+
+                    -- Phòng mới = random đúng 1 lần
+                    RunDeepnies(RoomNumber)
+
+                end
+
+                LastRoomNumber = CurrentRoom
+
+            end
+
+        end
+
+        task.wait(0.1)
+
+    end
+
+end)
+
+--========================================================--
+-- STOP FUNCTION
+--========================================================--
+
+System.Stop = function()
+
+    System.Running = false
+
+    table.clear(RolledRooms)
+
+    LastRoomNumber = nil
+    Initialized = false
+
+    print(
+        "[Deepnies Random] System stopped."
+    )
+
+end
+
+--========================================================--
+-- INFO
+--========================================================--
+
+print("==============================================")
+print("          DEEPNIES RANDOM DOOR SYSTEM")
+print("----------------------------------------------")
+print(" Chance per new room : 18.8%")
+print(" Initial room        : NO RANDOM")
+print(" Initial spawn       : OFF")
+print(" Duplicate roll      : OFF")
+print(" Random per room     : ON")
+print("==============================================")
     if not RoomNumber then
         return
     end
