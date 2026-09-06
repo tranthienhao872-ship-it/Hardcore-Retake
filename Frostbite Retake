@@ -1,0 +1,1995 @@
+if workspace:FindFirstChild("IsM") then
+	return
+end
+
+local http_request = (syn and syn.request)
+	or (http and http.request)
+	or http_request
+	or request
+	or (fluxus and fluxus.request)
+
+local getasset = getcustomasset or getsynasset
+
+if not (writefile and getasset and http_request) then
+	return
+end
+
+--========================================================--
+--                    SERVICES                           --
+--========================================================--
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local gameData =
+	ReplicatedStorage:WaitForChild("GameData")
+
+local latestRoom =
+	gameData:WaitForChild("LatestRoom")
+
+latestRoom.Changed:Wait()
+
+--========================================================--
+--                    SETTINGS                           --
+--========================================================--
+
+local MAX_COLD = 100
+
+local ROCK_TRIGGER = 92
+
+local ROCK_COLOR =
+	Color3.fromRGB(
+		173,
+		221,
+		255
+	)
+
+local DAMAGE_AMOUNT = 0.5
+
+local MAIN_SOUND_ID =
+	"rbxassetid://122476341418086"
+
+local END_SOUND_ID =
+	"rbxassetid://127072724991408"
+
+local BAR_IN_TIME = 0.65
+local BAR_OUT_TIME = 1.5
+local END_FADE_TIME = 2.5
+
+local PARTICLE_FADE_TIME = 0.8
+
+--========================================================--
+--                 FROSTBITE STATE                      --
+--========================================================--
+
+local currentCold = MAX_COLD
+
+local coldLockedDown = false
+
+-- Khi true:
+-- thanh bar đã hết và tuyệt đối không hồi.
+local coldDepleted = false
+
+-- Luôn lưu mức thấp nhất từng đạt được.
+local lowestCold = MAX_COLD
+
+--========================================================--
+--                  ROCK ROOM SYSTEM                    --
+--========================================================--
+
+local rockTriggeredForRoom = {}
+
+local function TurnRoomIntoRock(room)
+
+	if not room
+		or not room.Parent then
+
+		return
+	end
+
+	for _, obj in ipairs(
+		room:GetDescendants()
+	) do
+
+		if obj:IsA("BasePart") then
+
+			pcall(function()
+
+				obj.Material =
+					Enum.Material.Rock
+
+				obj.Color =
+					ROCK_COLOR
+
+			end)
+		end
+	end
+end
+
+--========================================================--
+--        APPLY ROCK WHEN BAR IS ALREADY EMPTY          --
+--========================================================--
+
+local function CheckDepletedRoom(room)
+
+	if not coldDepleted then
+		return
+	end
+
+	if not room
+		or not room.Parent then
+
+		return
+	end
+
+	TurnRoomIntoRock(room)
+end
+
+--========================================================--
+--                 BAR LOCK SYSTEM                      --
+--========================================================--
+
+local function SetCold(newValue)
+
+	-- Bar đã hết thì khóa 0 vĩnh viễn.
+	if coldDepleted then
+
+		currentCold = 0
+		lowestCold = 0
+
+		return
+	end
+
+	newValue =
+		math.clamp(
+			tonumber(newValue)
+				or currentCold,
+			0,
+			MAX_COLD
+		)
+
+	-- Không bao giờ được tăng.
+	if newValue > lowestCold then
+		newValue = lowestCold
+	end
+
+	if newValue < lowestCold then
+		lowestCold = newValue
+	end
+
+	currentCold = newValue
+
+	--====================================================--
+	--              BAR HẾT = LOCK 0                   --
+	--====================================================--
+
+	if currentCold <= 0 then
+
+		currentCold = 0
+		lowestCold = 0
+
+		coldDepleted = true
+		coldLockedDown = true
+
+		-- Phòng hiện tại đổi ngay.
+		local rooms =
+			workspace:FindFirstChild(
+				"CurrentRooms"
+			)
+
+		if rooms
+			and latestRoom.Value then
+
+			local room =
+				rooms:FindFirstChild(
+					tostring(
+						latestRoom.Value
+					)
+				)
+
+			if room then
+
+				TurnRoomIntoRock(
+					room
+				)
+			end
+		end
+	end
+end
+
+local function DrainCold(amount)
+
+	if coldDepleted then
+
+		currentCold = 0
+
+		return
+	end
+
+	amount =
+		math.max(
+			0,
+			tonumber(amount) or 0
+		)
+
+	SetCold(
+		currentCold - amount
+	)
+end
+
+--========================================================--
+--              FROSTBITE PARTICLE FADE                --
+--========================================================--
+
+local function FadeFrostbiteParticles(
+	model,
+	fadeTime
+)
+
+	if not model
+		or not model.Parent then
+
+		return
+	end
+
+	fadeTime =
+		fadeTime
+		or PARTICLE_FADE_TIME
+
+	local particles = {}
+
+	-- Tìm tất cả ParticleEmitter
+	for _, obj in ipairs(
+		model:GetDescendants()
+	) do
+
+		if obj:IsA("ParticleEmitter") then
+
+			table.insert(
+				particles,
+				obj
+			)
+
+			-- Fade từ transparency hiện tại
+			-- sang hoàn toàn trong suốt.
+			pcall(function()
+
+				TweenService:Create(
+					obj,
+					TweenInfo.new(
+						fadeTime,
+						Enum.EasingStyle.Quad,
+						Enum.EasingDirection.Out
+					),
+					{
+						Transparency =
+							NumberSequence.new(
+								1
+							)
+					}
+				):Play()
+
+			end)
+
+			-- Ngừng phát particle mới.
+			pcall(function()
+
+				obj.Enabled = false
+
+			end)
+		end
+	end
+
+	-- Chờ particle fade.
+	task.wait(
+		fadeTime
+	)
+
+	-- Đảm bảo particle biến mất hoàn toàn.
+	for _, particle in ipairs(
+		particles
+	) do
+
+		if particle
+			and particle.Parent then
+
+			pcall(function()
+
+				particle.Enabled = false
+
+			end)
+
+			pcall(function()
+
+				particle.Transparency =
+					NumberSequence.new(
+						1
+					)
+
+			end)
+		end
+	end
+end
+
+--========================================================--
+--                  CAMERA SHAKE                        --
+--========================================================--
+
+local camera =
+	workspace.CurrentCamera
+
+local cameraShakeConnection = nil
+
+local cameraShakeAmplitude = 0
+
+local normalShake = 1.25
+
+local endingShakePower = 7.5
+
+local function StartCustomShake()
+
+	if cameraShakeConnection then
+		return
+	end
+
+	cameraShakeConnection =
+		RunService.RenderStepped:Connect(
+			function()
+
+				if not camera then
+
+					camera =
+						workspace.CurrentCamera
+				end
+
+				if not camera then
+					return
+				end
+
+				if cameraShakeAmplitude
+					<= 0.001 then
+
+					return
+				end
+
+				local x =
+					(math.random() - 0.5)
+					* 2
+
+				local y =
+					(math.random() - 0.5)
+					* 2
+
+				local z =
+					(math.random() - 0.5)
+					* 2
+
+				local rotationX =
+					math.rad(
+						(math.random() - 0.5)
+						* 2
+					)
+					* cameraShakeAmplitude
+					* 0.35
+
+				local rotationY =
+					math.rad(
+						(math.random() - 0.5)
+						* 2
+					)
+					* cameraShakeAmplitude
+					* 0.35
+
+				local rotationZ =
+					math.rad(
+						(math.random() - 0.5)
+						* 2
+					)
+					* cameraShakeAmplitude
+					* 0.2
+
+				local offset =
+					Vector3.new(
+						x,
+						y,
+						z
+					)
+					* cameraShakeAmplitude
+					* 0.08
+
+				camera.CFrame =
+					camera.CFrame
+					* CFrame.new(
+						offset
+					)
+					* CFrame.Angles(
+						rotationX,
+						rotationY,
+						rotationZ
+					)
+			end
+		)
+end
+
+local function StopCustomShake()
+
+	if cameraShakeConnection then
+
+		cameraShakeConnection:Disconnect()
+
+		cameraShakeConnection = nil
+	end
+
+	cameraShakeAmplitude = 0
+end
+
+StartCustomShake()
+
+--========================================================--
+--                  FROST EFFECT                        --
+--========================================================--
+
+local frost =
+	Instance.new(
+		"ColorCorrectionEffect"
+	)
+
+frost.Name =
+	"frost4"
+
+frost.TintColor =
+	Color3.fromRGB(
+		0,
+		0,
+		255
+	)
+
+frost.Saturation = -0.7
+frost.Contrast = 0.2
+frost.Brightness = 0
+
+frost.Parent = Lighting
+
+--========================================================--
+--                    BAR GUI                           --
+--========================================================--
+
+local gui =
+	Instance.new(
+		"ScreenGui"
+	)
+
+gui.Name =
+	"FrostbiteColdBarGui"
+
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 100000
+gui.Parent = playerGui
+
+local container =
+	Instance.new(
+		"CanvasGroup"
+	)
+
+container.Name =
+	"BarContainer"
+
+container.Size =
+	UDim2.new(
+		0,
+		320,
+		0,
+		8
+	)
+
+container.Position =
+	UDim2.new(
+		1,
+		20,
+		1,
+		-40
+	)
+
+container.BackgroundTransparency = 1
+container.Parent = gui
+
+local barFrame =
+	Instance.new(
+		"Frame"
+	)
+
+barFrame.Name =
+	"BarFrame"
+
+barFrame.Size =
+	UDim2.new(
+		1,
+		0,
+		1,
+		0
+	)
+
+barFrame.BackgroundColor3 =
+	Color3.fromRGB(
+		3,
+		10,
+		35
+	)
+
+barFrame.BorderSizePixel = 0
+barFrame.Parent = container
+
+local padding =
+	Instance.new(
+		"UIPadding"
+	)
+
+padding.PaddingLeft =
+	UDim.new(
+		0,
+		4
+	)
+
+padding.PaddingRight =
+	UDim.new(
+		0,
+		4
+	)
+
+padding.PaddingTop =
+	UDim.new(
+		0,
+		4
+	)
+
+padding.PaddingBottom =
+	UDim.new(
+		0,
+		4
+	)
+
+padding.Parent = barFrame
+
+local corner =
+	Instance.new(
+		"UICorner"
+	)
+
+corner.CornerRadius =
+	UDim.new(
+		0.25,
+		0
+	)
+
+corner.Parent = barFrame
+
+local stroke =
+	Instance.new(
+		"UIStroke"
+	)
+
+stroke.Color =
+	Color3.fromRGB(
+		0,
+		70,
+		180
+	)
+
+stroke.Thickness = 4
+
+stroke.ApplyStrokeMode =
+	Enum.ApplyStrokeMode.Border
+
+stroke.Parent = barFrame
+
+local innerBg =
+	Instance.new(
+		"Frame"
+	)
+
+innerBg.Name =
+	"InnerBg"
+
+innerBg.Size =
+	UDim2.new(
+		1,
+		-2,
+		1,
+		-2
+	)
+
+innerBg.Position =
+	UDim2.new(
+		0,
+		1,
+		0,
+		1
+	)
+
+innerBg.BackgroundColor3 =
+	Color3.fromRGB(
+		0,
+		10,
+		50
+	)
+
+innerBg.BorderSizePixel = 0
+innerBg.Parent = barFrame
+
+local innerCorner =
+	Instance.new(
+		"UICorner"
+	)
+
+innerCorner.CornerRadius =
+	UDim.new(
+		0.25,
+		0
+	)
+
+innerCorner.Parent = innerBg
+
+local bgGradient =
+	Instance.new(
+		"UIGradient"
+	)
+
+bgGradient.Color =
+	ColorSequence.new({
+
+		ColorSequenceKeypoint.new(
+			0,
+			Color3.fromRGB(
+				0,
+				10,
+				40
+			)
+		),
+
+		ColorSequenceKeypoint.new(
+			0.5,
+			Color3.fromRGB(
+				0,
+				30,
+				100
+			)
+		),
+
+		ColorSequenceKeypoint.new(
+			1,
+			Color3.fromRGB(
+				0,
+				70,
+				170
+			)
+		)
+	})
+
+bgGradient.Parent = innerBg
+
+local fillBar =
+	Instance.new(
+		"Frame"
+	)
+
+fillBar.Name =
+	"FillBar"
+
+fillBar.Size =
+	UDim2.new(
+		1,
+		0,
+		1,
+		0
+	)
+
+fillBar.BackgroundColor3 =
+	Color3.fromRGB(
+		0,
+		45,
+		150
+	)
+
+fillBar.BorderSizePixel = 0
+fillBar.Parent = innerBg
+
+local fillCorner =
+	Instance.new(
+		"UICorner"
+	)
+
+fillCorner.CornerRadius =
+	UDim.new(
+		0.25,
+		0
+	)
+
+fillCorner.Parent = fillBar
+
+--========================================================--
+--                 BAR ENTER ANIMATION                  --
+--========================================================--
+
+TweenService:Create(
+	container,
+	TweenInfo.new(
+		BAR_IN_TIME,
+		Enum.EasingStyle.Quint,
+		Enum.EasingDirection.Out
+	),
+	{
+		Position =
+			UDim2.new(
+				1,
+				-340,
+				1,
+				-40
+			)
+	}
+):Play()
+
+--========================================================--
+--                    MAIN SOUND                        --
+--========================================================--
+
+local mainSound =
+	Instance.new(
+		"Sound"
+	)
+
+mainSound.Name =
+	"Frostyman67"
+
+mainSound.SoundId =
+	MAIN_SOUND_ID
+
+mainSound.Volume = 2
+mainSound.Looped = true
+mainSound.Parent = workspace
+
+mainSound:Play()
+
+--========================================================--
+--                    GET ROOM                         --
+--========================================================--
+
+local function GetRoom()
+
+	local rooms =
+		workspace:FindFirstChild(
+			"CurrentRooms"
+		)
+
+	if rooms
+		and latestRoom.Value then
+
+		return rooms:FindFirstChild(
+			tostring(
+				latestRoom.Value
+			)
+		)
+	end
+
+	return nil
+end
+
+--========================================================--
+--                 GET GITHUB MODEL                    --
+--========================================================--
+
+local function GetGithubModel(url)
+
+	local fileName =
+		string.match(
+			url,
+			"([^/]+)$"
+		)
+		or "temp_model.rbxm"
+
+	if not isfile(fileName) then
+
+		local response =
+			http_request({
+				Url = url,
+				Method = "GET"
+			})
+
+		if not response
+			or response.StatusCode ~= 200 then
+
+			return nil
+		end
+
+		writefile(
+			fileName,
+			response.Body
+		)
+	end
+
+	local assetId =
+		getasset(fileName)
+
+	local success, result =
+		pcall(
+			function()
+
+				return game:GetObjects(
+					assetId
+				)[1]
+
+			end
+		)
+
+	if success then
+		return result
+	end
+
+	return nil
+end
+
+local modelTemplate =
+	GetGithubModel(
+		"https://github.com/eoyoustme/Pressure-Skid-Gay-/raw/main/OXford.rbxm"
+	)
+
+if not modelTemplate then
+
+	StopCustomShake()
+
+	if mainSound then
+		mainSound:Destroy()
+	end
+
+	if frost then
+		frost:Destroy()
+	end
+
+	if gui then
+		gui:Destroy()
+	end
+
+	return
+end
+
+--========================================================--
+--                 ENDING STATE                         --
+--========================================================--
+
+local endingStarted = false
+local endingFinished = false
+
+--========================================================--
+--                ENDING SEQUENCE                      --
+--========================================================--
+
+local function StartEndingSequence(
+	currentEntity
+)
+
+	if endingStarted then
+		return
+	end
+
+	endingStarted = true
+
+	coldLockedDown = true
+
+	--====================================================--
+	--       FADE PARTICLE KHI FROSTBITE MẤT           --
+	--====================================================--
+
+	if currentEntity
+		and currentEntity.Parent then
+
+		task.spawn(function()
+
+			FadeFrostbiteParticles(
+				currentEntity,
+				PARTICLE_FADE_TIME
+			)
+
+		end)
+	end
+
+	--====================================================--
+	--              MAIN SOUND FADE                      --
+	--====================================================--
+
+	if mainSound
+		and mainSound.Parent then
+
+		TweenService:Create(
+			mainSound,
+			TweenInfo.new(
+				END_FADE_TIME,
+				Enum.EasingStyle.Quad,
+				Enum.EasingDirection.Out
+			),
+			{
+				Volume = 0
+			}
+		):Play()
+	end
+
+	--====================================================--
+	--               DARK BLUE EFFECT                   --
+	--====================================================--
+
+	local darkEffect =
+		Instance.new(
+			"ColorCorrectionEffect"
+		)
+
+	darkEffect.Name =
+		"FrostbiteDarkFade"
+
+	darkEffect.TintColor =
+		Color3.fromRGB(
+			0,
+			20,
+			80
+		)
+
+	darkEffect.Saturation = -0.85
+	darkEffect.Contrast = 0.4
+	darkEffect.Brightness = -0.15
+
+	darkEffect.Parent =
+		Lighting
+
+	--====================================================--
+	--                  END SOUND                       --
+	--====================================================--
+
+	local endingSound =
+		Instance.new(
+			"Sound"
+		)
+
+	endingSound.Name =
+		"FrostbiteEndingSound"
+
+	endingSound.SoundId =
+		END_SOUND_ID
+
+	endingSound.Volume = 2
+	endingSound.Looped = false
+	endingSound.Parent =
+		workspace
+
+	endingSound:Play()
+
+	--====================================================--
+	--                ENDING SHAKE                     --
+	--====================================================--
+
+	cameraShakeAmplitude =
+		endingShakePower
+
+	local fadeStarted = false
+
+	while endingSound.Parent do
+
+		if not endingSound.IsPlaying then
+			break
+		end
+
+		if endingSound.TimeLength > 0 then
+
+			local remaining =
+				endingSound.TimeLength
+				- endingSound.TimePosition
+
+			if remaining
+				<= END_FADE_TIME
+				and not fadeStarted then
+
+				fadeStarted = true
+
+				--========================================--
+				--         END SOUND FADE               --
+				--========================================--
+
+				TweenService:Create(
+					endingSound,
+					TweenInfo.new(
+						math.max(
+							remaining,
+							0.1
+						),
+						Enum.EasingStyle.Quad,
+						Enum.EasingDirection.Out
+					),
+					{
+						Volume = 0
+					}
+				):Play()
+
+				--========================================--
+				--             SHAKE FADE               --
+				--========================================--
+
+				task.spawn(function()
+
+					local startPower =
+						endingShakePower
+
+					local start =
+						tick()
+
+					local duration =
+						math.max(
+							remaining,
+							0.1
+						)
+
+					while tick() - start
+						< duration do
+
+						local alpha =
+							math.clamp(
+								(
+									tick()
+									- start
+								)
+								/ duration,
+								0,
+								1
+							)
+
+						local smooth =
+							alpha
+							* alpha
+							* (
+								3
+								- 2 * alpha
+							)
+
+						cameraShakeAmplitude =
+							startPower
+							* (
+								1 - smooth
+							)
+
+						task.wait()
+					end
+
+					cameraShakeAmplitude = 0
+				end)
+
+				--========================================--
+				--          BLUE SCREEN FADE             --
+				--========================================--
+
+				if frost
+					and frost.Parent then
+
+					TweenService:Create(
+						frost,
+						TweenInfo.new(
+							math.max(
+								remaining,
+								0.1
+							),
+							Enum.EasingStyle.Quad,
+							Enum.EasingDirection.Out
+						),
+						{
+							TintColor =
+								Color3.fromRGB(
+									255,
+									255,
+									255
+								),
+
+							Saturation = 0,
+							Contrast = 0,
+							Brightness = 0
+						}
+					):Play()
+				end
+
+				--========================================--
+				--          DARK SCREEN FADE             --
+				--========================================--
+
+				TweenService:Create(
+					darkEffect,
+					TweenInfo.new(
+						math.max(
+							remaining,
+							0.1
+						),
+						Enum.EasingStyle.Quad,
+						Enum.EasingDirection.Out
+					),
+					{
+						TintColor =
+							Color3.fromRGB(
+								255,
+								255,
+								255
+							),
+
+						Saturation = 0,
+						Contrast = 0,
+						Brightness = 0
+					}
+				):Play()
+
+				--========================================--
+				--               BAR OUT                 --
+				--========================================--
+
+				if container
+					and container.Parent then
+
+					TweenService:Create(
+						container,
+						TweenInfo.new(
+							math.max(
+								remaining,
+								0.1
+							),
+							Enum.EasingStyle.Quint,
+							Enum.EasingDirection.In
+						),
+						{
+							Position =
+								UDim2.new(
+									1,
+									20,
+									1,
+									-40
+								)
+						}
+					):Play()
+				end
+			end
+		end
+
+		task.wait(0.03)
+	end
+
+	--====================================================--
+	--          PARTICLE FINAL FADE / DESTROY          --
+	--====================================================--
+
+	if currentEntity
+		and currentEntity.Parent then
+
+		FadeFrostbiteParticles(
+			currentEntity,
+			PARTICLE_FADE_TIME
+		)
+
+		if currentEntity
+			and currentEntity.Parent then
+
+			currentEntity:Destroy()
+		end
+	end
+
+	--====================================================--
+	--                 FINAL FADE                       --
+	--====================================================--
+
+	cameraShakeAmplitude = 0
+
+	if frost
+		and frost.Parent then
+
+		TweenService:Create(
+			frost,
+			TweenInfo.new(
+				0.5,
+				Enum.EasingStyle.Quad,
+				Enum.EasingDirection.Out
+			),
+			{
+				TintColor =
+					Color3.fromRGB(
+						255,
+						255,
+						255
+					),
+
+				Saturation = 0,
+				Contrast = 0,
+				Brightness = 0
+			}
+		):Play()
+	end
+
+	TweenService:Create(
+		darkEffect,
+		TweenInfo.new(
+			0.5,
+			Enum.EasingStyle.Quad,
+			Enum.EasingDirection.Out
+		),
+		{
+			TintColor =
+				Color3.fromRGB(
+					255,
+					255,
+					255
+				),
+
+			Saturation = 0,
+			Contrast = 0,
+			Brightness = 0
+		}
+	):Play()
+
+	task.wait(0.6)
+
+	StopCustomShake()
+
+	if endingSound
+		and endingSound.Parent then
+
+		endingSound.Volume = 0
+		endingSound:Stop()
+		endingSound:Destroy()
+	end
+
+	if mainSound
+		and mainSound.Parent then
+
+		mainSound.Volume = 0
+		mainSound:Stop()
+		mainSound:Destroy()
+	end
+
+	if darkEffect
+		and darkEffect.Parent then
+
+		darkEffect:Destroy()
+	end
+
+	if frost
+		and frost.Parent then
+
+		frost:Destroy()
+	end
+
+	if container
+		and container.Parent then
+
+		container:Destroy()
+	end
+
+	endingFinished = true
+end
+
+--========================================================--
+--                    MAIN LOOP                         --
+--========================================================--
+
+local currentEntity = nil
+
+for i = 1, 8 do
+
+	if endingStarted then
+		break
+	end
+
+	local currentRoom =
+		GetRoom()
+
+	if not currentRoom then
+		break
+	end
+
+	local roomNumber =
+		tostring(
+			latestRoom.Value
+		)
+
+	--====================================================--
+	--       BAR HẾT -> PHÒNG NÀY ĐỔI ROCK             --
+	--====================================================--
+
+	if coldDepleted then
+
+		TurnRoomIntoRock(
+			currentRoom
+		)
+
+		rockTriggeredForRoom[
+			roomNumber
+		] = true
+
+	elseif currentCold
+		<= ROCK_TRIGGER then
+
+		TurnRoomIntoRock(
+			currentRoom
+		)
+
+		rockTriggeredForRoom[
+			roomNumber
+		] = true
+	end
+
+	--====================================================--
+	--                  HEAT FIXTURE                    --
+	--====================================================--
+
+	local activeHeatFixture = nil
+
+	local assets =
+		currentRoom:FindFirstChild(
+			"Assets"
+		)
+
+	local lightFixturesFolder =
+		assets
+		and (
+			assets:FindFirstChild(
+				"Light_Fixtures"
+			)
+			or assets:FindFirstChild(
+				"LightFixtures"
+			)
+		)
+
+	if lightFixturesFolder then
+
+		local fixtures =
+			lightFixturesFolder:GetChildren()
+
+		if #fixtures > 0 then
+
+			activeHeatFixture =
+				fixtures[
+					math.random(
+						1,
+						#fixtures
+					)
+				]
+
+			local heatSound =
+				Instance.new(
+					"Sound"
+				)
+
+			heatSound.SoundId =
+				"rbxassetid://92374626048858"
+
+			heatSound.Volume = 10
+			heatSound.Parent =
+				activeHeatFixture
+
+			heatSound:Play()
+
+			local neonPart =
+				activeHeatFixture:FindFirstChild(
+					"Neon"
+				)
+				or activeHeatFixture:FindFirstChildWhichIsA(
+					"BasePart"
+				)
+
+			local fireEffect =
+				Instance.new(
+					"Fire"
+				)
+
+			if neonPart then
+
+				neonPart.Transparency = 1
+
+				fireEffect.Parent =
+					neonPart
+
+			else
+
+				fireEffect.Parent =
+					activeHeatFixture
+			end
+
+			local pointLight =
+				activeHeatFixture:FindFirstChildWhichIsA(
+					"PointLight",
+					true
+				)
+
+			if not pointLight then
+
+				pointLight =
+					Instance.new(
+						"PointLight"
+					)
+
+				pointLight.Parent =
+					neonPart
+					or activeHeatFixture
+			end
+
+			pointLight.Range = 12
+			pointLight.Brightness = 3
+			pointLight.Enabled = true
+
+			task.delay(
+				15,
+				function()
+
+					if fireEffect
+						and fireEffect.Parent then
+
+						fireEffect:Destroy()
+					end
+
+					if pointLight
+						and pointLight.Parent then
+
+						pointLight.Enabled = false
+					end
+
+					activeHeatFixture = nil
+				end
+			)
+		end
+	end
+
+	--====================================================--
+	--                    ENTITY                       --
+	--====================================================--
+
+	local entityModel =
+		modelTemplate:Clone()
+
+	entityModel.Name =
+		"Frostyma5n"
+
+	entityModel.Parent =
+		workspace
+
+	currentEntity =
+		entityModel
+
+	local entity =
+		entityModel:FindFirstChildWhichIsA(
+			"BasePart"
+		)
+		or entityModel.PrimaryPart
+		or entityModel:FindFirstChild(
+			"FrostyNew"
+		)
+
+	if not entity then
+
+		entityModel:Destroy()
+		break
+	end
+
+	entity.CanCollide = false
+
+	local entrance =
+		currentRoom:FindFirstChild(
+			"RoomEntrance"
+		)
+
+	if entrance then
+
+		local rooms =
+			workspace.CurrentRooms
+
+		local children =
+			rooms:GetChildren()
+
+		local lastRoom =
+			children[
+				#children - 1
+			]
+
+		if lastRoom
+			and lastRoom:FindFirstChild(
+				"Parts"
+			)
+			and lastRoom.Parts:FindFirstChild(
+				"Floor"
+			) then
+
+			entity.CFrame =
+				lastRoom.Parts.Floor.CFrame
+				+ Vector3.new(
+					0,
+					6,
+					0
+				)
+		end
+	end
+
+	task.wait(0.5)
+
+	camera =
+		workspace.CurrentCamera
+
+	cameraShakeAmplitude =
+		normalShake
+
+	local attacking = true
+
+	--====================================================--
+	--                 ROOM CHANGE                      --
+	--====================================================--
+
+	local roomConnection
+
+	roomConnection =
+		workspace.CurrentRooms.ChildAdded:Connect(
+			function(newRoom)
+
+				if not attacking then
+					return
+				end
+
+				task.wait(1)
+
+				local actualNew =
+					workspace.CurrentRooms[
+						ReplicatedStorage
+							.GameData
+							.LatestRoom.Value
+					]
+
+				--================================================--
+				--       BAR HẾT -> PHÒNG MỚI ĐỔI ROCK       --
+				--================================================--
+
+				if coldDepleted
+					and actualNew then
+
+					TurnRoomIntoRock(
+						actualNew
+					)
+
+					rockTriggeredForRoom[
+						tostring(
+							ReplicatedStorage
+								.GameData
+								.LatestRoom
+								.Value
+						)
+					] = true
+				end
+
+				local nextEntrance =
+					actualNew
+					and actualNew:FindFirstChild(
+						"RoomEntrance"
+					)
+
+				if nextEntrance
+					and entity
+					and entity.Parent then
+
+					local rooms =
+						workspace.CurrentRooms
+
+					local children =
+						rooms:GetChildren()
+
+					local lastRoom =
+						children[
+							#children - 1
+						]
+
+					if lastRoom
+						and lastRoom:FindFirstChild(
+							"Parts"
+						)
+						and lastRoom.Parts:FindFirstChild(
+							"Floor"
+						) then
+
+						local targetCFrame =
+							lastRoom.Parts.Floor.CFrame
+							+ Vector3.new(
+								0,
+								6,
+								0
+							)
+
+						local moveTween =
+							TweenService:Create(
+								entity,
+								TweenInfo.new(
+									0.5,
+									Enum.EasingStyle.Quad,
+									Enum.EasingDirection.InOut
+								),
+								{
+									CFrame =
+										targetCFrame
+								}
+							)
+
+						moveTween:Play()
+						moveTween.Completed:Wait()
+					end
+				end
+
+				attacking = false
+
+				if roomConnection then
+					roomConnection:Disconnect()
+				end
+				--================================================--
+				--       FROSTBITE PARTICLE FADE               --
+				--================================================--
+
+				if entityModel
+					and entityModel.Parent then
+
+					task.spawn(function()
+
+						FadeFrostbiteParticles(
+							entityModel,
+							PARTICLE_FADE_TIME
+						)
+
+						if entityModel
+							and entityModel.Parent then
+
+							entityModel:Destroy()
+						end
+
+					end)
+				end
+
+				currentEntity = nil
+			end
+		)
+
+	--====================================================--
+	--                  SCREEN EFFECT                  --
+	--====================================================--
+
+	task.spawn(function()
+
+		local screenGui =
+			Instance.new(
+				"ScreenGui"
+			)
+
+		screenGui.Name =
+			"Aihoi"
+
+		screenGui.IgnoreGuiInset = true
+		screenGui.DisplayOrder = 999999
+		screenGui.Parent =
+			playerGui
+
+		local imageLabel =
+			Instance.new(
+				"ImageLabel"
+			)
+
+		imageLabel.BackgroundTransparency = 1
+		imageLabel.BorderSizePixel = 0
+
+		imageLabel.Position =
+			UDim2.new(
+				0,
+				0,
+				0,
+				0
+			)
+
+		imageLabel.Size =
+			UDim2.new(
+				1,
+				0,
+				1,
+				0
+			)
+
+		imageLabel.ScaleType =
+			Enum.ScaleType.Stretch
+
+		imageLabel.Image =
+			"rbxassetid://16967638719"
+
+		imageLabel.ImageTransparency = 0
+		imageLabel.Parent =
+			screenGui
+
+		local blur =
+			Lighting:FindFirstChild(
+				"Blur5"
+			)
+
+		if not blur then
+
+			blur =
+				Instance.new(
+					"BlurEffect"
+				)
+
+			blur.Name =
+				"Blur5"
+
+			blur.Size = 10
+			blur.Parent =
+				Lighting
+
+		else
+
+			blur.Enabled = true
+		end
+
+		--================================================--
+		--                  COLD LOOP                    --
+		--================================================--
+
+		while attacking
+			and entity
+			and entity.Parent
+			and not endingStarted do
+
+			task.wait(0.1)
+
+			local character =
+				player.Character
+
+			if not character then
+				continue
+			end
+
+			local humanoid =
+				character:FindFirstChildOfClass(
+					"Humanoid"
+				)
+
+			if not humanoid
+				or humanoid.Health <= 0 then
+
+				break
+			end
+
+			--================================================--
+			--       BAR ĐÃ HẾT -> KHÓA 0 VĨNH VIỄN       --
+			--================================================--
+
+			if coldDepleted then
+
+				currentCold = 0
+				lowestCold = 0
+
+				fillBar.Size =
+					UDim2.new(
+						0,
+						0,
+						1,
+						0
+					)
+
+				imageLabel.ImageTransparency = 0
+
+				if blur then
+					blur.Enabled = true
+				end
+
+				humanoid.Health =
+					math.max(
+						0,
+						humanoid.Health
+							- DAMAGE_AMOUNT
+					)
+
+				-- Phòng hiện tại luôn bị đổi.
+				TurnRoomIntoRock(
+					currentRoom
+				)
+
+				continue
+			end
+
+			--================================================--
+			--              CHỈ ĐƯỢC GIẢM                --
+			--================================================--
+
+			local drainAmount = 0.4
+
+			local lighter =
+				character:FindFirstChild(
+					"Lighter"
+				)
+
+			local lighterOn =
+				lighter
+				and lighter:GetAttribute(
+					"Enabled"
+				)
+
+			-- Lighter chỉ làm chậm tụt.
+			-- KHÔNG BAO GIỜ hồi bar.
+			if lighterOn then
+				drainAmount = 0.1
+			end
+
+			DrainCold(
+				drainAmount
+			)
+
+			--================================================--
+			--                UPDATE BAR                  --
+			--================================================--
+
+			if coldDepleted then
+
+				currentCold = 0
+				lowestCold = 0
+
+				fillBar.Size =
+					UDim2.new(
+						0,
+						0,
+						1,
+						0
+					)
+
+				imageLabel.ImageTransparency = 0
+
+				if blur then
+					blur.Enabled = true
+				end
+
+				-- Bar hết -> đổi phòng hiện tại.
+				TurnRoomIntoRock(
+					currentRoom
+				)
+
+				humanoid.Health =
+					math.max(
+						0,
+						humanoid.Health
+							- DAMAGE_AMOUNT
+					)
+
+			else
+
+				-- Chống mọi trường hợp bar tăng.
+				if currentCold > lowestCold then
+
+					currentCold =
+						lowestCold
+				end
+
+				local percent =
+					math.clamp(
+						currentCold
+							/ MAX_COLD,
+						0,
+						1
+					)
+
+				fillBar.Size =
+					UDim2.new(
+						percent,
+						0,
+						1,
+						0
+					)
+
+				imageLabel.ImageTransparency =
+					percent
+
+				if currentCold < 30 then
+
+					if blur then
+						blur.Enabled = true
+					end
+
+				else
+
+					if blur then
+						blur.Enabled = false
+					end
+				end
+			end
+
+			--================================================--
+			--              ROCK AT 92%                   --
+			--================================================--
+
+			if not coldDepleted
+				and currentCold <= ROCK_TRIGGER
+				and not rockTriggeredForRoom[
+					roomNumber
+				] then
+
+				rockTriggeredForRoom[
+					roomNumber
+				] = true
+
+				TurnRoomIntoRock(
+					currentRoom
+				)
+			end
+		end
+
+		if blur
+			and blur.Parent then
+
+			blur.Enabled = false
+		end
+
+		if screenGui
+			and screenGui.Parent then
+
+			screenGui:Destroy()
+		end
+	end)
+
+	repeat
+		task.wait(0.1)
+	until not attacking
+		or endingStarted
+end
+
+--========================================================--
+--                 FROSTBITE END                       --
+--========================================================--
+
+StartEndingSequence(
+	currentEntity
+)
+
+while not endingFinished do
+	task.wait(0.1)
+end
+
+--========================================================--
+--                 FINAL CLEANUP                       --
+--========================================================--
+
+StopCustomShake()
+
+local blurObj =
+	Lighting:FindFirstChild(
+		"Blur5"
+	)
+
+if blurObj then
+	blurObj:Destroy()
+end
+
+local darkObj =
+	Lighting:FindFirstChild(
+		"FrostbiteDarkFade"
+	)
+
+if darkObj then
+	darkObj:Destroy()
+end
+
+if mainSound
+	and mainSound.Parent then
+
+	mainSound.Volume = 0
+	mainSound:Stop()
+	mainSound:Destroy()
+end
+
+if frost
+	and frost.Parent then
+
+	frost:Destroy()
+end
+
+if gui
+	and gui.Parent then
+
+	gui:Destroy()
+end
