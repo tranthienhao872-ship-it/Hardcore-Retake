@@ -1,0 +1,90 @@
+--=Cặc
+-- 1. Shocker Retake
+-- 2. Ripper Retake
+-- 3. Rebound Retake
+-- 4. Cease Retake
+-- 5. Bla5
+-- 6. Deer God Retake
+-- 7. Monoxide
+-- 8. Frostbite
+-- 9. Deepniess
+--========================================================--
+
+local Scripts = {
+    {
+        Name = "Shocker Retake",
+        URL = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Hardcore-Retake/refs/heads/main/Shocker%20Retake"
+    },
+
+    {
+        Name = "Ripper Retake",
+        URL = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Hardcore-Retake/refs/heads/main/Ripper%20Retake"
+    },
+
+    {
+        Name = "Rebound Retake",
+        URL = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Hardcore-Retake/refs/heads/main/Rebound%20Retake"
+    },
+
+    {
+        Name = "Cease Retake",
+        URL = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Hardcore-Retake/refs/heads/main/Cease%20Retake"
+    },
+
+    {
+        Name = "Bla5",
+        URL = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Bla/refs/heads/main/Bla5"
+    },
+
+    {
+        Name = "Deer God Retake",
+        URL = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Hardcore-Retake/refs/heads/main/Deer%20god%20Retake"
+    },
+
+    {
+        Name = "Monoxide",
+        URL = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Multi-Monster-phase/refs/heads/main/Monoxide"
+    },
+
+    {
+        Name = "Frostbite",
+        URL = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Frostbitessss"
+    },
+
+    {
+        Name = "Deepniess",
+        URL = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Bla/refs/heads/main/Deepniess"
+    }
+}
+
+--========================================================--
+--                    LOAD SYSTEM                       --
+--========================================================--
+
+for i, Script in ipairs(Scripts) do
+    task.spawn(function()
+        local success, result = pcall(function()
+            local Source = game:HttpGet(Script.URL)
+            local Function = loadstring(Source)
+
+            if not Function then
+                error("loadstring failed")
+            end
+
+            return Function()
+        end)
+
+        if success then
+            print("[Retake Hub] ✓ " .. i .. "/9 Loaded: " .. Script.Name)
+        else
+            warn("[Retake Hub] ✗ " .. i .. "/9 Failed: " .. Script.Name)
+            warn(tostring(result))
+        end
+    end)
+
+    task.wait(0.15)
+end
+
+print("========================================")
+print("[Retake Hub] 9 scripts loaded!")
+print("========================================")
