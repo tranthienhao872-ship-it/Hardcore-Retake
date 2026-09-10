@@ -1,0 +1,395 @@
+--==================================================
+-- SCRIPT 1: LONG TEXT EFFECT
+--==================================================
+
+local player = game.Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Xóa GUI cũ nếu script chạy lại
+local oldGui = playerGui:FindFirstChild("LongTextGui")
+if oldGui then
+	oldGui:Destroy()
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "LongTextGui"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.DisplayOrder = 999999
+screenGui.Parent = playerGui
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(0, 600, 0, 60)
+label.Position = UDim2.new(0.5, -300, 1, -100)
+label.BackgroundTransparency = 1
+label.Text = "Why you in here..is so SO LONG..."
+label.TextColor3 = Color3.new(1, 1, 1)
+label.TextScaled = true
+label.FontFace = Font.new(
+	"rbxasset://fonts/families/Antique.json",
+	Enum.FontWeight.Bold,
+	Enum.FontStyle.Normal
+)
+label.TextTransparency = 1
+label.Parent = screenGui
+
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 2
+stroke.Color = Color3.fromRGB(128, 128, 128)
+stroke.Transparency = 1
+stroke.Parent = label
+
+local TweenService = game:GetService("TweenService")
+
+local startPos = label.Position
+local risePos = startPos + UDim2.new(0, 0, 0, -20)
+
+local shaking = false
+
+local function shakeEffect()
+	local shakeAmount = 6
+
+	while shaking and label.Parent do
+		local offsetX = math.random(-shakeAmount, shakeAmount)
+		local offsetY = math.random(-shakeAmount, shakeAmount)
+
+		label.Position =
+			risePos + UDim2.new(0, offsetX, 0, offsetY)
+
+		task.wait(0.03)
+	end
+end
+
+local function playEffect()
+	label.Position = startPos
+	label.TextTransparency = 1
+	stroke.Transparency = 1
+
+	-- FADE IN + RISE
+	local fadeIn = TweenService:Create(
+		label,
+		TweenInfo.new(1, Enum.EasingStyle.Quad),
+		{
+			Position = risePos,
+			TextTransparency = 0
+		}
+	)
+
+	local strokeIn = TweenService:Create(
+		stroke,
+		TweenInfo.new(1, Enum.EasingStyle.Quad),
+		{
+			Transparency = 0
+		}
+	)
+
+	fadeIn:Play()
+	strokeIn:Play()
+
+	-- Đợi chữ hiện hoàn toàn
+	fadeIn.Completed:Wait()
+
+	-- SHAKE
+	shaking = true
+	task.spawn(shakeEffect)
+
+	task.wait(1.5)
+
+	-- STOP SHAKE
+	shaking = false
+	label.Position = risePos
+
+	-- FADE OUT
+	local fadeOut = TweenService:Create(
+		label,
+		TweenInfo.new(1, Enum.EasingStyle.Quad),
+		{
+			TextTransparency = 1
+		}
+	)
+
+	local strokeOut = TweenService:Create(
+		stroke,
+		TweenInfo.new(1, Enum.EasingStyle.Quad),
+		{
+			Transparency = 1
+		}
+	)
+
+	fadeOut:Play()
+	strokeOut:Play()
+
+	-- QUAN TRỌNG:
+	-- Đợi fade-out hoàn thành rồi mới cho Script Entity chạy
+	fadeOut.Completed:Wait()
+end
+
+-- Chạy Script 1 trước
+playEffect()
+
+-- Xóa GUI sau khi Script 1 hoàn thành
+if screenGui then
+	screenGui:Destroy()
+end
+
+
+--==================================================
+-- SCRIPT 2: ENTITY SPAWNER
+--==================================================
+
+getgenv().OgHungerNewSpawner = nil
+
+local success, Spawner = pcall(function()
+	return loadstring(game:HttpGet(
+		"https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/OgHungerNewSpawner"
+	))()
+end)
+
+if not success or not Spawner then
+	return
+end
+
+local entity = Spawner:Create({
+	Entity = {
+		Name = "Templete Entity",
+		Asset = "12872618108",
+		HeightOffset = -2
+	},
+
+	Lights = {
+		Flicker = {
+			Enabled = true,
+			Duration = 120
+		},
+		Shatter = true,
+		Repair = false
+	},
+
+	Earthquake = {
+		Enabled = true
+	},
+
+	Spawned = {
+		ChangeColorWhenSpawn = true,
+		Rainbow = false,
+		Color = Color3.fromRGB(255, 0, 0)
+	},
+
+	CameraShake = {
+		Enabled = true,
+		Range = 100,
+		Values = {20, 20, 0.1, 1}
+	},
+
+	Movement = {
+		Speed = 120,
+		SpeedFast = 370,
+		MoveFastNotEnter = false,
+		Delay = 2.5,
+		Reversed = false,
+		EndWhenEnterLatestRoom = false,
+		EndDelay = 2.5,
+
+		ReboundMoving = false,
+		TweenSecond = 1.5,
+
+		ReboundMoveStyle = false,
+		ReboundStyleTimes = 3,
+		ReboundStyleSound = "rbxassetid://130994177179386",
+		ReboundStyleVolume = 5
+	},
+
+	Jumpscare = {
+		Enabled = false,
+		Image1 = "rbxassetid://11253398403",
+		Image2 = "rbxassetid://12293509957",
+		Sound1 = "rbxassetid://0",
+		Sound2 = "rbxassetid://109582246349306",
+
+		Tease = {
+			[1] = true,
+			Min = 1,
+			Max = 1
+		},
+
+		Flashing = {
+			[1] = true,
+			[2] = Color3.fromRGB(255, 255, 255)
+		},
+
+		Shake = true
+	},
+
+	Rebounding = {
+		Enabled = true,
+		Type = "Ambush",
+		Min = 1,
+		Max = 120,
+		Delay = 0
+	},
+
+	Damage = {
+		Enabled = true,
+		KillOnMove = false,
+		Range = 40,
+		Amount = 45,
+		IgnoreHiding = false,
+
+		JumpscareRipper = {
+			Enabled = false,
+			TargetPartName = "Ripe",
+			AttachmentName = "ripe",
+			ParticleName = "ParticleEmitter",
+			ParticleTexture = "rbxassetid://12737595583",
+			SoundUrl = "https://github.com/eoyoustme/back/raw/main/Kill_with_static.mp3",
+			SlamSoundId = "rbxassetid://0",
+			EndSoundId = "rbxassetid://4988621968",
+
+			Images = {
+				"rbxassetid://8482795900",
+				"rbxassetid://236542974",
+				"rbxassetid://184251462",
+				"rbxassetid://236777652"
+			},
+
+			FlashDuration = 1.6
+		}
+	},
+
+	Crucifixion = {
+		Enabled = true,
+		Range = 40,
+		Resist = false,
+		Break = true
+	},
+
+	Death = {
+		Type = "Curious",
+
+		Hints = {
+			"Don't stay in the rooms to long..",
+			"He's gotta kill you if you see him..",
+			"Bye..",
+			"Good luck.."
+		},
+
+		Cause = "Scribbles"
+	}
+})
+
+
+--==================================================
+-- ENTITY CALLBACKS
+--==================================================
+
+entity:SetCallback("OnSpawned", function()
+
+	local sound5 = Instance.new("Sound")
+
+	sound5.PlaybackSpeed = 0.6
+	sound5.Volume = 10
+	sound5.SoundId = "rbxassetid://0"
+	sound5.Parent = workspace
+	sound5:Play()
+
+	local pitch = Instance.new("PitchShiftSoundEffect")
+	pitch.Octave = 0.875
+	pitch.Parent = sound5
+
+	local introShake
+
+	task.spawn(function()
+
+		local CameraShaker = require(
+			game.ReplicatedStorage:WaitForChild("CameraShaker")
+		)
+
+		local _CurrentCamera = workspace.CurrentCamera
+
+		introShake = CameraShaker.new(
+			Enum.RenderPriority.Camera.Value,
+			function(p143)
+				_CurrentCamera.CFrame =
+					_CurrentCamera.CFrame * p143
+			end
+		)
+
+		introShake:Start()
+
+		introShake:Shake(
+			CameraShaker.Presets.Earthquake
+		)
+
+		task.wait(5.771)
+
+		if sound5 then
+			sound5:Destroy()
+		end
+
+		task.spawn(function()
+
+			if introShake then
+				introShake:StopSustained(0.2)
+			end
+
+		end)
+
+	end)
+
+end)
+
+
+entity:SetCallback("OnStartMoving", function()
+
+end)
+
+
+entity:SetCallback("OnEnterRoom", function(
+	room: Model,
+	firstTime: boolean
+)
+
+end)
+
+
+entity:SetCallback("OnLookAt", function(
+	lineOfSight: boolean
+)
+
+end)
+
+
+entity:SetCallback("OnRebounding", function(
+	startOfRebound: boolean
+)
+
+end)
+
+
+entity:SetCallback("EndWhenGO", function()
+
+end)
+
+
+entity:SetCallback("OnDespawning", function()
+
+end)
+
+
+entity:SetCallback("OnDespawned", function()
+
+end)
+
+
+entity:SetCallback("OnDamagePlayer", function(
+	newHealth: number
+)
+
+end)
+
+
+--==================================================
+-- RUN ENTITY
+--==================================================
+
+entity:Run(true)
