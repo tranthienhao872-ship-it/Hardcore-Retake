@@ -104,7 +104,7 @@ local entityList = {
 	{ name = "Silence",       url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Hardcore-Retake/refs/heads/main/Silence%20Retake",       chance = 10 },
 	{ name = "CEASE",      url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Is%20hard",      chance = 17 },
 	{ name = "Deergod",    url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/67",  chance = 3.9 },
-	{ name = "Ripper",    url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Rippers",  chance = 15.5 },
+	{ name = "Ripper",    url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Rippers",  chance = 14 },
 	{ name = "Monoxide", url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Hardcore-Retake/refs/heads/main/Monoxide%20Retake", chance = 0.25},
 	{ name = "Frostbite", url = "https://github.com/tranthienhao872-ship-it/Hardcore-Retake/raw/refs/heads/main/Frostbite%20Retake", chance = 0.67},
 	{ name = "Deepniess", url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Deepnies", chance = 3.2}
