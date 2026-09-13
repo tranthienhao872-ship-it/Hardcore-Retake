@@ -1,0 +1,1630 @@
+--//====================================================
+--// GRAY SCREEN + GRAY LIGHT + IMAGE VIGNETTE
+--// HIDE 10 -> 0 + ENTITY + GLITCH
+--// LOOP LIÊN TỤC -> 200S -> FADE -> STOP
+--// MUSIC LOOP + MUSIC FADE
+--// Delta Executor | Client Side
+--//====================================================
+
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local Player = Players.LocalPlayer
+if not Player then return end
+
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+--====================================================
+-- CONFIG
+--====================================================
+
+local EFFECT_NAME = "DeltaGrayScreen"
+local LIGHT_NAME = "DeltaGrayLight"
+local VIGNETTE_GUI_NAME = "DoorsImageVignette"
+local CAPTION_GUI_NAME = "DeltaHideCaption"
+local MUSIC_NAME = "DeltaEffectMusic"
+
+local GRAY_FADE_TIME = 1.2
+local VIGNETTE_FADE_TIME = 1.5
+
+local FIRST_HIDE_DELAY = 30
+local HIDE_LOOP_TIME = 30
+local TOTAL_DURATION = 200
+local FINAL_FADE_TIME = 3
+
+local GRAY_BRIGHTNESS = -0.08
+local GRAY_CONTRAST = 0.15
+local GRAY_SATURATION = -1
+
+local LIGHT_COLOR = Color3.fromRGB(150,150,150)
+local LIGHT_BRIGHTNESS = 4
+local LIGHT_RANGE = 25
+
+local VIGNETTE_IMAGE = "rbxassetid://16967650108"
+
+--====================================================
+-- MUSIC
+--====================================================
+
+local MUSIC_ID = "rbxassetid://131161990326376"
+local MUSIC_VOLUME = 1
+
+--====================================================
+-- STATE
+--====================================================
+
+local ScriptRunning = true
+
+local currentLight = nil
+local vignetteGui = nil
+local vignetteImage = nil
+local stopVignette = nil
+local music = nil
+
+--====================================================
+-- CLEAN OLD
+--====================================================
+
+local oldEffect = Lighting:FindFirstChild(EFFECT_NAME)
+if oldEffect then
+	oldEffect:Destroy()
+end
+
+local oldCaption = PlayerGui:FindFirstChild(CAPTION_GUI_NAME)
+if oldCaption then
+	oldCaption:Destroy()
+end
+
+local oldVignette = PlayerGui:FindFirstChild(VIGNETTE_GUI_NAME)
+if oldVignette then
+	oldVignette:Destroy()
+end
+
+local oldMusic = workspace:FindFirstChild(MUSIC_NAME)
+if oldMusic then
+	oldMusic:Destroy()
+end
+
+local Character = Player.Character or Player.CharacterAdded:Wait()
+
+local oldLight = Character:FindFirstChild(LIGHT_NAME)
+if oldLight then
+	oldLight:Destroy()
+end
+
+--====================================================
+-- GRAY SCREEN
+--====================================================
+
+local ColorEffect = Instance.new("ColorCorrectionEffect")
+ColorEffect.Name = EFFECT_NAME
+ColorEffect.Brightness = 0
+ColorEffect.Contrast = 0
+ColorEffect.Saturation = 0
+ColorEffect.Parent = Lighting
+
+local screenTween = TweenService:Create(
+	ColorEffect,
+	TweenInfo.new(
+		GRAY_FADE_TIME,
+		Enum.EasingStyle.Sine,
+		Enum.EasingDirection.Out
+	),
+	{
+		Brightness = GRAY_BRIGHTNESS,
+		Contrast = GRAY_CONTRAST,
+		Saturation = GRAY_SATURATION
+	}
+)
+
+screenTween:Play()
+
+--====================================================
+-- GRAY LIGHT
+--====================================================
+
+local function CreateGrayLight(char)
+
+	if not char then return end
+
+	local root =
+		char:FindFirstChild("HumanoidRootPart")
+		or char:WaitForChild("HumanoidRootPart",5)
+
+	if not root then return end
+
+	local old = root:FindFirstChild(LIGHT_NAME)
+	if old then
+		old:Destroy()
+	end
+
+	local light = Instance.new("PointLight")
+
+	light.Name = LIGHT_NAME
+	light.Color = LIGHT_COLOR
+	light.Brightness = 0
+	light.Range = LIGHT_RANGE
+	light.Shadows = true
+	light.Parent = root
+
+	currentLight = light
+
+	TweenService:Create(
+		light,
+		TweenInfo.new(
+			GRAY_FADE_TIME,
+			Enum.EasingStyle.Sine,
+			Enum.EasingDirection.Out
+		),
+		{
+			Brightness = LIGHT_BRIGHTNESS
+		}
+	):Play()
+end
+
+CreateGrayLight(Character)
+
+--====================================================
+-- RESPAWN LIGHT
+--====================================================
+
+Player.CharacterAdded:Connect(function(char)
+
+	if not ScriptRunning then
+		return
+	end
+
+	task.wait(0.5)
+
+	CreateGrayLight(char)
+
+	local effect = Lighting:FindFirstChild(EFFECT_NAME)
+
+	if effect then
+		effect.Brightness = GRAY_BRIGHTNESS
+		effect.Contrast = GRAY_CONTRAST
+		effect.Saturation = GRAY_SATURATION
+	end
+
+end)
+
+--====================================================
+-- IMAGE VIGNETTE
+--====================================================
+
+local function CreateVignette()
+
+	local old =
+		PlayerGui:FindFirstChild(VIGNETTE_GUI_NAME)
+
+	if old then
+		old:Destroy()
+	end
+
+	local gui = Instance.new("ScreenGui")
+
+	gui.Name = VIGNETTE_GUI_NAME
+	gui.ResetOnSpawn = false
+	gui.IgnoreGuiInset = true
+	gui.DisplayOrder = 999999
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+	gui.Parent = PlayerGui
+
+	local image = Instance.new("ImageLabel")
+
+	image.Name = "Vignette"
+
+	image.AnchorPoint =
+		Vector2.new(0.5,0.5)
+
+	image.Position =
+		UDim2.fromScale(0.5,0.5)
+
+	image.Size =
+		UDim2.fromScale(1,1)
+
+	image.BackgroundTransparency = 1
+	image.BorderSizePixel = 0
+
+	image.Image = VIGNETTE_IMAGE
+	image.ImageColor3 =
+		Color3.fromRGB(0,0,0)
+
+	image.ImageTransparency = 1
+
+	image.ScaleType =
+		Enum.ScaleType.Stretch
+
+	image.ZIndex = 10
+	image.Parent = gui
+
+	--================================================
+	-- FADE VIGNETTE IN
+	--================================================
+
+	local fade =
+		TweenService:Create(
+			image,
+
+			TweenInfo.new(
+				VIGNETTE_FADE_TIME,
+				Enum.EasingStyle.Sine,
+				Enum.EasingDirection.Out
+			),
+
+			{
+				ImageTransparency = 0
+			}
+		)
+
+	fade:Play()
+	fade.Completed:Wait()
+
+	if not ScriptRunning then
+		gui:Destroy()
+		return nil,nil,function() end
+	end
+
+	--================================================
+	-- FAST BREATHING
+	--================================================
+
+	local breathing = true
+
+	task.spawn(function()
+
+		while breathing
+			and ScriptRunning
+			and gui.Parent do
+
+			image.Size =
+				UDim2.fromScale(1.08,1.08)
+
+			task.wait(0.045)
+
+			if not breathing
+				or not ScriptRunning
+				or not gui.Parent then
+				break
+			end
+
+			image.Size =
+				UDim2.fromScale(1,1)
+
+			task.wait(0.045)
+		end
+
+	end)
+
+	return gui,image,function()
+		breathing = false
+	end
+
+end
+
+--====================================================
+-- MUSIC
+-- Loop từ lúc bắt đầu cho tới hết 200 giây
+--====================================================
+
+local function StartMusic()
+
+	local old =
+		workspace:FindFirstChild(MUSIC_NAME)
+
+	if old then
+		old:Destroy()
+	end
+
+	local sound =
+		Instance.new("Sound")
+
+	sound.Name = MUSIC_NAME
+	sound.SoundId = MUSIC_ID
+	sound.Volume = MUSIC_VOLUME
+	sound.Looped = true
+	sound.PlaybackSpeed = 1
+	sound.Parent = workspace
+
+	music = sound
+
+	sound:Play()
+
+end
+
+--====================================================
+-- CAMERA SHAKE MỖI 2 GIÂY
+--====================================================
+
+local function StartCameraShake(duration)
+
+	task.spawn(function()
+
+		local success, CameraShaker =
+			pcall(function()
+
+				return require(
+					game.ReplicatedStorage:
+						WaitForChild("CameraShaker")
+				)
+
+			end)
+
+		if not success or not CameraShaker then
+			return
+		end
+
+		local startTime = os.clock()
+
+		local shaker =
+			CameraShaker.new(
+				Enum.RenderPriority.Camera.Value,
+
+				function(shakeCf)
+
+					if not ScriptRunning then
+						return
+					end
+
+					local camera =
+						workspace.CurrentCamera
+
+					if camera then
+						camera.CFrame =
+							camera.CFrame
+							* shakeCf
+					end
+
+				end
+			)
+
+		shaker:Start()
+
+		while ScriptRunning
+			and os.clock() - startTime < duration do
+
+			shaker:ShakeOnce(
+				15,
+				12,
+				0.05,
+				0.45,
+				0,
+				0.8
+			)
+
+			task.wait(2)
+		end
+
+		pcall(function()
+			shaker:StopSustained(0.5)
+		end)
+
+	end)
+
+end
+
+--====================================================
+-- GLITCH
+-- Không đổi màu màn hình
+--====================================================
+
+local function RunGlitch()
+
+	if not ScriptRunning then
+		return
+	end
+
+	task.spawn(function()
+
+		local localPlayer = Players.LocalPlayer
+
+		local random = math.random
+		local vector3New = Vector3.new
+
+		local MAX_DISTANCE = 150
+		local GLITCH_INTENSITY = 1.5
+		local GLITCH_DURATION = 2.5
+
+		local startTime = os.clock()
+
+		local visualClones = {}
+		local targetParts = {}
+
+		setmetatable(
+			visualClones,
+			{
+				__mode = "k"
+			}
+		)
+
+		local function isExcluded(part)
+
+			if not part:IsA("BasePart")
+				or part:IsA("Terrain")
+				or part.Name == "GlitchVisualClone" then
+
+				return true
+			end
+
+			local current = part.Parent
+
+			while current
+				and current ~= workspace do
+
+				if current:IsA("Model")
+					and current.Name == "Stalker" then
+
+					return true
+				end
+
+				if current:IsA("Model")
+					and Players:GetPlayerFromCharacter(current) then
+
+					return true
+				end
+
+				current = current.Parent
+			end
+
+			return false
+		end
+
+		local function setupVisualClone(part)
+
+			if visualClones[part] then
+				return
+			end
+
+			local success, clone =
+				pcall(function()
+					return part:Clone()
+				end)
+
+			if not success or not clone then
+				return
+			end
+
+			for _, child in ipairs(
+				clone:GetDescendants()
+			) do
+
+				if child:IsA("LuaSourceContainer")
+					or child:IsA("BodyMover")
+					or child:IsA("Constraint") then
+
+					child:Destroy()
+				end
+
+			end
+
+			clone.CanCollide = false
+			clone.CanTouch = false
+			clone.CanQuery = false
+			clone.Anchored = true
+			clone.Name = "GlitchVisualClone"
+			clone.Transparency = 1
+			clone.Parent = part
+
+			visualClones[part] = {
+
+				Clone = clone,
+
+				OriginalSize =
+					part.Size,
+
+				OriginalCFrame =
+					part.CFrame,
+
+				OriginalColor =
+					part.Color,
+
+				OriginalTransparency =
+					part.Transparency
+			}
+		end
+
+		for _, part in ipairs(
+			workspace:GetDescendants()
+		) do
+
+			if not ScriptRunning then
+				break
+			end
+
+			if not isExcluded(part) then
+
+				table.insert(
+					targetParts,
+					part
+				)
+
+				setupVisualClone(part)
+			end
+
+		end
+
+		if not ScriptRunning then
+			return
+		end
+
+		local heartbeatConnection
+
+		heartbeatConnection =
+			RunService.Heartbeat:Connect(
+				function()
+
+					if not ScriptRunning then
+						return
+					end
+
+					local character =
+						localPlayer.Character
+
+					local rootPart =
+						character
+						and character:FindFirstChild(
+							"HumanoidRootPart"
+						)
+
+					if not rootPart then
+						return
+					end
+
+					local playerPosition =
+						rootPart.Position
+
+					local elapsedTime =
+						os.clock() - startTime
+
+					local progress =
+						math.clamp(
+							elapsedTime /
+								GLITCH_DURATION,
+							0,
+							1
+						)
+
+					local currentIntensity =
+						GLITCH_INTENSITY
+						* progress
+
+					for i =
+						#targetParts,
+						1,
+						-1 do
+
+						if not ScriptRunning then
+							break
+						end
+
+						local part =
+							targetParts[i]
+
+						if not part
+							or not part.Parent then
+
+							table.remove(
+								targetParts,
+								i
+							)
+
+							continue
+						end
+
+						local data =
+							visualClones[part]
+
+						if data then
+
+							local clone =
+								data.Clone
+
+							local distance =
+								(
+									part.Position
+									- playerPosition
+								).Magnitude
+
+							if distance <=
+								MAX_DISTANCE then
+
+								part.Transparency = 1
+
+								clone.Transparency =
+									data.OriginalTransparency
+
+								local shakeX =
+									(
+										random(-100,100)
+										/100
+									)
+									* currentIntensity
+
+								local shakeY =
+									(
+										random(-100,100)
+										/100
+									)
+									* currentIntensity
+
+								local shakeZ =
+									(
+										random(-100,100)
+										/100
+									)
+									* currentIntensity
+
+								local offsetCFrame =
+									CFrame.new(
+										shakeX * 0.2,
+										shakeY * 0.2,
+										shakeZ * 0.2
+									)
+									*
+									CFrame.Angles(
+										math.rad(
+											shakeX * 8
+										),
+										math.rad(
+											shakeY * 8
+										),
+										math.rad(
+											shakeZ * 8
+										)
+									)
+
+								clone.CFrame =
+									data.OriginalCFrame
+									* offsetCFrame
+
+								if random() > 0.6 then
+
+									clone.Size =
+										data.OriginalSize
+										+
+										vector3New(
+											shakeX * 1.5,
+											shakeY * 1.5,
+											shakeZ * 1.5
+										)
+
+								else
+
+									clone.Size =
+										data.OriginalSize
+
+								end
+
+								for _, child in ipairs(
+									clone:GetChildren()
+								) do
+
+									if child:IsA("Texture") then
+
+										child.OffsetStudsU =
+											random(-50,50)
+
+										child.OffsetStudsV =
+											random(-50,50)
+
+										child.StudsPerTileU =
+											random(5,100) * 0.1
+
+										child.StudsPerTileV =
+											random(5,100) * 0.1
+
+									end
+
+								end
+
+							else
+
+								part.Transparency =
+									data.OriginalTransparency
+
+								clone.Transparency = 1
+
+								clone.CFrame =
+									data.OriginalCFrame
+
+								clone.Size =
+									data.OriginalSize
+
+								clone.Color =
+									data.OriginalColor
+
+							end
+						end
+					end
+				end
+			)
+
+		task.wait(GLITCH_DURATION)
+
+		if heartbeatConnection then
+			heartbeatConnection:Disconnect()
+		end
+
+		for part,data in pairs(
+			visualClones
+		) do
+
+			if part
+				and part.Parent then
+
+				part.Transparency =
+					data.OriginalTransparency
+			end
+
+			if data.Clone
+				and data.Clone.Parent then
+
+				data.Clone:Destroy()
+			end
+
+		end
+
+	end)
+
+end
+
+--====================================================
+-- ENTITY
+-- GIỮ NGUYÊN CONFIG
+--====================================================
+
+local function SpawnEntity()
+
+	if not ScriptRunning then
+		return
+	end
+
+	getgenv().OgHungerNewSpawner = nil
+
+	local success, Spawner =
+		pcall(function()
+
+			return loadstring(
+				game:HttpGet(
+					"https://raw.githubusercontent.com/eoyoustme/Mayhem-Remake/refs/heads/main/OgHungerNewSpawner"
+				)
+			)()
+
+		end)
+
+	if not success
+		or not Spawner
+		or not ScriptRunning then
+
+		return
+	end
+
+	local entity = Spawner:Create({
+
+		Entity = {
+			Name = "Templete Entity",
+			Asset = "12872618108",
+			HeightOffset = -2
+		},
+
+		Lights = {
+			Flicker = {
+				Enabled = true,
+				Duration = 200
+			},
+			Shatter = true,
+			Repair = false
+		},
+
+		Earthquake = {
+			Enabled = false
+		},
+
+		Spawned = {
+			ChangeColorWhenSpawn = true,
+			Rainbow = false,
+			Color =
+				Color3.fromRGB(
+					255,0,0
+				)
+		},
+
+		CameraShake = {
+			Enabled = true,
+			Range = 100,
+			Values = {
+				200,
+				200,
+				0.1,
+				1
+			}
+		},
+
+		Movement = {
+			Speed = 100,
+			SpeedFast = 370,
+			MoveFastNotEnter = false,
+			Delay = 5.771,
+			Reversed = true,
+			EndWhenEnterLatestRoom = false,
+			EndDelay = 2.5,
+			ReboundMoving = false,
+			TweenSecond = 1.5,
+			ReboundMoveStyle = false,
+			ReboundStyleTimes = 3,
+			ReboundStyleSound =
+				"rbxassetid://130994177179386",
+			ReboundStyleVolume = 5
+		},
+
+		Jumpscare = {
+			Enabled = false,
+			Image1 =
+				"rbxassetid://11253398403",
+			Image2 =
+				"rbxassetid://12293509957",
+			Sound1 =
+				"rbxassetid://0",
+			Sound2 =
+				"rbxassetid://109582246349306",
+
+			Tease = {
+				[1] = true,
+				Min = 1,
+				Max = 1
+			},
+
+			Flashing = {
+				[1] = true,
+				[2] =
+					Color3.fromRGB(
+						255,
+						255,
+						255
+					)
+			},
+
+			Shake = true
+		},
+
+		Rebounding = {
+			Enabled = true,
+			Type = "Blitz",
+			Min = 1,
+			Max = 2,
+			Delay = 0
+		},
+
+		Damage = {
+			Enabled = true,
+			KillOnMove = false,
+			Range = 40,
+			Amount = 25,
+			IgnoreHiding = false,
+
+			JumpscareRipper = {
+				Enabled = false,
+				TargetPartName = "Ripe",
+				AttachmentName = "ripe",
+				ParticleName =
+					"ParticleEmitter",
+				ParticleTexture =
+					"rbxassetid://12737595583",
+				SoundUrl =
+					"https://github.com/eoyoustme/back/raw/main/Kill_with_static.mp3",
+				SlamSoundId =
+					"rbxassetid://0",
+				EndSoundId =
+					"rbxassetid://4988621968",
+
+				Images = {
+					"rbxassetid://8482795900",
+					"rbxassetid://236542974",
+					"rbxassetid://184251462",
+					"rbxassetid://236777652"
+				},
+
+				FlashDuration = 1.6
+			}
+		},
+
+		Crucifixion = {
+			Enabled = true,
+			Range = 40,
+			Resist = false,
+			Break = true
+		},
+
+		Death = {
+			Type = "Curious",
+			Hints = {
+				"...",
+				"...",
+				"...",
+				"..."
+			},
+			Cause = "..."
+		}
+
+	})
+
+	--================================================
+	-- ON SPAWNED
+	--================================================
+
+	entity:SetCallback(
+		"OnSpawned",
+		function()
+
+			if not ScriptRunning then
+				return
+			end
+
+			local sound5 =
+				Instance.new("Sound")
+
+			sound5.PlaybackSpeed = 0.6
+			sound5.Volume = 10
+			sound5.SoundId = "rbxassetid://"
+			sound5.Parent = workspace
+			sound5:Play()
+
+			local pitch =
+				Instance.new(
+					"PitchShiftSoundEffect"
+				)
+
+			pitch.Octave = 0.875
+			pitch.Parent = sound5
+
+			local introShake
+
+			task.spawn(function()
+
+				local success2,
+					CameraShaker =
+					pcall(function()
+
+						return require(
+							game.ReplicatedStorage:
+								WaitForChild(
+									"CameraShaker"
+								)
+						)
+
+					end)
+
+				if not success2
+					or not CameraShaker then
+
+					if sound5 then
+						sound5:Destroy()
+					end
+
+					return
+				end
+
+				introShake =
+					CameraShaker.new(
+						Enum.RenderPriority.Camera.Value,
+
+						function(shakeCf)
+
+							if not ScriptRunning then
+								return
+							end
+
+							local camera =
+								workspace.CurrentCamera
+
+							if camera then
+								camera.CFrame =
+									camera.CFrame
+									* shakeCf
+							end
+
+						end
+					)
+
+				introShake:Start()
+
+				introShake:Shake(
+					CameraShaker.Presets.Earthquake
+				)
+
+				task.wait(5.771)
+
+				if sound5 then
+					sound5:Destroy()
+				end
+
+				if introShake then
+
+					pcall(function()
+
+						introShake:
+							StopSustained(0.2)
+
+					end)
+
+				end
+
+			end)
+
+		end
+	)
+
+	entity:SetCallback(
+		"OnStartMoving",
+		function()
+		end
+	)
+
+	entity:SetCallback(
+		"OnEnterRoom",
+		function(
+			room: Model,
+			firstTime: boolean
+		)
+		end
+	)
+
+	entity:SetCallback(
+		"OnLookAt",
+		function(
+			lineOfSight: boolean
+		)
+		end
+	)
+
+	entity:SetCallback(
+		"OnRebounding",
+		function(
+			startOfRebound: boolean
+		)
+		end
+	)
+
+	entity:SetCallback(
+		"EndWhenGO",
+		function()
+		end
+	)
+
+	entity:SetCallback(
+		"OnDespawning",
+		function()
+		end
+	)
+
+	entity:SetCallback(
+		"OnDespawned",
+		function()
+		end
+	)
+
+	entity:SetCallback(
+		"OnDamagePlayer",
+		function(
+			newHealth: number
+		)
+		end
+	)
+
+	entity:Run(true)
+
+end
+
+--====================================================
+-- HIDE CAPTION
+--====================================================
+
+local function ShowHideCountdown()
+
+	if not ScriptRunning then
+		return
+	end
+
+	local old =
+		PlayerGui:FindFirstChild(
+			CAPTION_GUI_NAME
+		)
+
+	if old then
+		old:Destroy()
+	end
+
+	local gui =
+		Instance.new("ScreenGui")
+
+	gui.Name =
+		CAPTION_GUI_NAME
+
+	gui.ResetOnSpawn = false
+	gui.IgnoreGuiInset = true
+	gui.DisplayOrder = 1000000
+	gui.ZIndexBehavior =
+		Enum.ZIndexBehavior.Global
+
+	gui.Parent =
+		PlayerGui
+
+	local caption =
+		Instance.new("TextLabel")
+
+	caption.Name =
+		"HideCaption"
+
+	caption.AnchorPoint =
+		Vector2.new(0.5,0.5)
+
+	local basePosition =
+		UDim2.fromScale(
+			0.5,
+			0.78
+		)
+
+	caption.Position =
+		basePosition
+
+	caption.Size =
+		UDim2.new(
+			0.8,
+			0,
+			0,
+			55
+		)
+
+	caption.BackgroundTransparency = 1
+
+	caption.Text = "HIDE : 10"
+
+	caption.Font =
+		Enum.Font.Oswald
+
+	caption.TextSize = 38
+
+	caption.TextColor3 =
+		Color3.fromRGB(
+			190,
+			190,
+			190
+		)
+
+	caption.TextStrokeColor3 =
+		Color3.fromRGB(
+			45,
+			45,
+			45
+		)
+
+	caption.TextStrokeTransparency = 0
+
+	caption.TextXAlignment =
+		Enum.TextXAlignment.Center
+
+	caption.TextYAlignment =
+		Enum.TextYAlignment.Center
+
+	caption.ZIndex = 20
+	caption.Parent = gui
+
+	--================================================
+	-- FADE IN
+	--================================================
+
+caption.TextTransparency = 1
+	caption.TextStrokeTransparency = 1
+
+	local fadeIn =
+		TweenService:Create(
+			caption,
+
+			TweenInfo.new(
+				0.3,
+				Enum.EasingStyle.Sine,
+				Enum.EasingDirection.Out
+			),
+
+			{
+				TextTransparency = 0,
+				TextStrokeTransparency = 0
+			}
+		)
+
+	fadeIn:Play()
+	fadeIn.Completed:Wait()
+
+	if not ScriptRunning then
+		gui:Destroy()
+		return
+	end
+
+	--================================================
+	-- STRONG SHAKE
+	--================================================
+
+	local function StrongShake()
+
+		local shakes = {
+
+			Vector2.new(-9,5),
+			Vector2.new(9,-5),
+
+			Vector2.new(-8,-6),
+			Vector2.new(8,6),
+
+			Vector2.new(-7,5),
+			Vector2.new(7,-5),
+
+			Vector2.new(-6,-4),
+			Vector2.new(6,4),
+
+			Vector2.new(-5,3),
+			Vector2.new(5,-3),
+
+			Vector2.new(-4,-2),
+			Vector2.new(4,2),
+
+			Vector2.new(-2,1),
+			Vector2.new(2,-1),
+
+			Vector2.new(0,0)
+		}
+
+		for _,offset in ipairs(shakes) do
+
+			if not ScriptRunning then
+				return
+			end
+
+			caption.Position =
+				UDim2.new(
+					0.5,
+					offset.X,
+					0.78,
+					offset.Y
+				)
+
+			task.wait(0.018)
+		end
+
+		caption.Position =
+			basePosition
+	end
+
+	--================================================
+	-- 10 -> 0
+	--================================================
+
+	for number = 10,0,-1 do
+
+		if not ScriptRunning then
+			break
+		end
+
+		caption.Text =
+			"HIDE : "
+			.. tostring(number)
+
+		StrongShake()
+
+		if number > 0 then
+			task.wait(1)
+		end
+
+	end
+
+	if gui and gui.Parent then
+		gui:Destroy()
+	end
+
+end
+
+--====================================================
+-- START FLOW
+--====================================================
+
+-- Nhạc bắt đầu cùng effect
+StartMusic()
+
+-- Màn hình xám
+screenTween:Play()
+
+-- Đợi màn hình xám hoàn thành
+screenTween.Completed:Wait()
+
+if not ScriptRunning then
+	return
+end
+
+--====================================================
+-- VIGNETTE SAU KHI MÀN HÌNH XÁM XONG
+--====================================================
+
+vignetteGui,
+	vignetteImage,
+	stopVignette =
+	CreateVignette()
+
+if not ScriptRunning then
+	return
+end
+
+--====================================================
+-- TIMER 200 GIÂY
+--====================================================
+
+local effectStart =
+	os.clock()
+
+local effectEnd =
+	effectStart
+	+ TOTAL_DURATION
+
+StartCameraShake(
+	TOTAL_DURATION
+)
+
+--====================================================
+-- ĐỢI 30 GIÂY
+--====================================================
+
+while ScriptRunning
+	and os.clock() < effectEnd do
+
+	local elapsed =
+		os.clock()
+		- effectStart
+
+	if elapsed >= FIRST_HIDE_DELAY then
+		break
+	end
+
+	task.wait(
+		math.min(
+			0.1,
+			FIRST_HIDE_DELAY - elapsed
+		)
+	)
+
+end
+
+--====================================================
+-- LOOP HIDE + ENTITY + GLITCH
+--====================================================
+
+while ScriptRunning
+	and os.clock() < effectEnd do
+
+	--===============================================
+	-- HIDE 10 -> 0
+	--===============================================
+
+	ShowHideCountdown()
+
+	if not ScriptRunning
+		or os.clock() >= effectEnd then
+
+		break
+	end
+
+	--===============================================
+	-- HIDE = 0
+	-- ENTITY
+	--===============================================
+
+	RunGlitch()
+
+	SpawnEntity()
+
+	--===============================================
+	-- GIỮ CHU KỲ 30 GIÂY
+	--===============================================
+
+	local nextCycle =
+		os.clock()
+		+ HIDE_LOOP_TIME
+
+	while ScriptRunning
+		and os.clock() < nextCycle
+		and os.clock() < effectEnd do
+
+		task.wait(0.1)
+
+	end
+
+end
+
+--====================================================
+-- 200 GIÂY HẾT
+--====================================================
+
+ScriptRunning = false
+
+--====================================================
+-- STOP VIGNETTE BREATHING
+--====================================================
+
+if stopVignette then
+	pcall(stopVignette)
+end
+
+--====================================================
+-- FADE TOÀN BỘ + NHẠC
+--====================================================
+
+local fadeTweens = {}
+
+-- GRAY SCREEN
+local finalEffect =
+	Lighting:FindFirstChild(
+		EFFECT_NAME
+	)
+
+if finalEffect then
+
+	table.insert(
+		fadeTweens,
+
+		TweenService:Create(
+			finalEffect,
+
+			TweenInfo.new(
+				FINAL_FADE_TIME,
+				Enum.EasingStyle.Sine,
+				Enum.EasingDirection.InOut
+			),
+
+			{
+				Brightness = 0,
+				Contrast = 0,
+				Saturation = 0
+			}
+		)
+	)
+
+end
+
+-- GRAY LIGHT
+if currentLight
+	and currentLight.Parent then
+
+	table.insert(
+		fadeTweens,
+
+		TweenService:Create(
+			currentLight,
+
+			TweenInfo.new(
+				FINAL_FADE_TIME,
+				Enum.EasingStyle.Sine,
+				Enum.EasingDirection.InOut
+			),
+
+			{
+				Brightness = 0
+			}
+		)
+	)
+
+end
+
+-- VIGNETTE
+if vignetteImage
+	and vignetteImage.Parent then
+
+	table.insert(
+		fadeTweens,
+
+		TweenService:Create(
+			vignetteImage,
+
+			TweenInfo.new(
+				FINAL_FADE_TIME,
+				Enum.EasingStyle.Sine,
+				Enum.EasingDirection.InOut
+			),
+
+			{
+				ImageTransparency = 1
+			}
+		)
+	)
+
+end
+
+--====================================================
+-- MUSIC FADE
+--====================================================
+
+if music
+	and music.Parent then
+
+	table.insert(
+		fadeTweens,
+
+		TweenService:Create(
+			music,
+
+			TweenInfo.new(
+				FINAL_FADE_TIME,
+				Enum.EasingStyle.Sine,
+				Enum.EasingDirection.InOut
+			),
+
+			{
+				Volume = 0
+			}
+		)
+	)
+
+end
+
+--====================================================
+-- PLAY ALL FADE
+--====================================================
+
+for _,tween in ipairs(
+	fadeTweens
+) do
+
+	tween:Play()
+
+end
+
+task.wait(
+	FINAL_FADE_TIME
+)
+
+--====================================================
+-- CLEAN EVERYTHING
+--====================================================
+
+if music
+	and music.Parent then
+
+	music:Stop()
+	music:Destroy()
+
+end
+
+if vignetteGui
+	and vignetteGui.Parent then
+
+	vignetteGui:Destroy()
+
+end
+
+local finalCaption =
+	PlayerGui:FindFirstChild(
+		CAPTION_GUI_NAME
+	)
+
+if finalCaption then
+	finalCaption:Destroy()
+end
+
+if currentLight
+	and currentLight.Parent then
+
+	currentLight:Destroy()
+
+end
+
+if finalEffect
+	and finalEffect.Parent then
+
+	finalEffect:Destroy()
+
+end
+
+--====================================================
+-- END
+--====================================================
+
+ScriptRunning = false
+
+return
