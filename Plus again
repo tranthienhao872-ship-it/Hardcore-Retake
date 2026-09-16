@@ -62,7 +62,7 @@ hint.Text = "Hold On Wait Load Asset 3/10"
 wait(1)
 hint.Text = "Hold On Wait Load Asset 4/10"
 loadstring(game:HttpGet("https://github.com/tranthienhao872-ship-it/Hardcore-Retake/raw/refs/heads/main/Stamina"))()
-wait(0.2)
+wait(0.15)
 
 hint.Text = "Hold On Wait Load Asset 5/10 ( Load Stamina Succesfully )"
 wait(1)
@@ -254,8 +254,7 @@ end
 local checkedRooms = {}
 
 local function checkAndSpawnEntity(roomNum)
-	local spawnDelay = 10
-	task.wait(spawnDelay)
+	wait(20)
 	if IsSeekActive() then return end
 	if checkedRooms[roomNum] then return end
 	checkedRooms[roomNum] = true
@@ -267,6 +266,7 @@ local function checkAndSpawnEntity(roomNum)
 		local currentChance = entityData.chance
 
 		if roll <= currentChance then
+				wait(4)
 			task.spawn(function()
 
 				if not IsSeekActive() then
