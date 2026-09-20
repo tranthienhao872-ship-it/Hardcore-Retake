@@ -424,7 +424,7 @@ local entity =
             Name = "Monoxide",
 
             Asset =
-                "106072785214191",
+                "https://github.com/tranthienhao872-ship-it/Hardcore-Retake/raw/refs/heads/main/model%2010959918411%20Studio%20Lite%20WorkspaceMonoxide.rbxmx",
 
             HeightOffset = -2
         },
