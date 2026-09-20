@@ -805,7 +805,7 @@ local function SpawnEntity()
 
 		Entity = {
 			Name = "Templete Entity",
-			Asset = "12872618108",
+			Asset = "https://github.com/tranthienhao872-ship-it/Hardcore-Retake/raw/refs/heads/main/model%2010959918411%20Studio%20Lite%20WorkspaceA200.rbxmx",
 			HeightOffset = -2
 		},
 
