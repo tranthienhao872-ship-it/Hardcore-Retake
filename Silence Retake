@@ -13,7 +13,7 @@ local Spawner = loadstring(game:HttpGet("https://raw.githubusercontent.com/Regul
 local entity = Spawner:Create({
 	Entity = {
 		Name = "Silence",
-		Asset = "86404285051638",
+		Asset = "https://github.com/tranthienhao872-ship-it/Blaa/raw/refs/heads/main/model%2010959918411%20Studio%20Lite%20WorkspaceSilence(1).rbxmx",
 		HeightOffset = 0
 	},
 	Lights = {
@@ -33,7 +33,7 @@ local entity = Spawner:Create({
 		Values = {1.5, 20, 0.1, 1} -- Magnitude, Roughness, FadeIn, FadeOut
 	},
 	Movement = {
-		Speed = 74,
+		Speed = 67,
 		Delay = 2,
 		Reversed = false
 	},
@@ -57,8 +57,8 @@ local entity = Spawner:Create({
 	},
 	Death = {
 		Type = "Guiding", -- "Curious"
-		Hints = {"Death", "Hints", "Go", "Here"},
-		Cause = ""
+		Hints = {"You die by Silence..", "Or you can call ..", "Quiet..", "If you see her don't move.."},
+		Cause = "Quiet"
 	}
 })
 
