@@ -194,16 +194,16 @@ if gameData then
 end
 
 local entityList = {
-	{ name = "Rebound", url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Bla2", chance = 2.5 },
+	{ name = "Rebound", url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Bla2", chance = 1.5 },
 	{ name = "Silence",       url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Hardcore-Retake/refs/heads/main/Silence%20Retake",       chance = 10 },
-	{ name = "Cease",      url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Is%20hard",      chance = 17 },
+	{ name = "Cease",      url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Is%20hard",      chance = 18 },
 	{ name = "Deergod",    url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/67",  chance = 0.55 },
 	{ name = "Ripper",    url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Rippers",  chance = 18.2 },
 	{ name = "Monoxide", url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Hardcore-Retake/refs/heads/main/Monoxide%20Retake", chance = 0.15},
 	{ name = "Frostbite", url = "https://github.com/tranthienhao872-ship-it/Hardcore-Retake/raw/refs/heads/main/Frostbite%20Retake", chance = 0.87},
 	{ name = "Deepniess", url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Deepnies", chance = 0.2},
 	{ name = "A-200", url = "https://github.com/tranthienhao872-ship-it/Hardcore-Retake/raw/refs/heads/main/A-200%20Retake", chance = 0.05},
-	{ name = "A-90", url = "https://github.com/tranthienhao872-ship-it/Hardcore-Retake/raw/refs/heads/main/A-90%20Retake", chance = 10},
+	{ name = "A-90", url = "https://github.com/tranthienhao872-ship-it/Hardcore-Retake/raw/refs/heads/main/A-90%20Retake", chance = 5},
 }
 
 task.spawn(function()
