@@ -303,7 +303,7 @@ task.spawn(function()
 
 			if not hasGottenAchievement then
 				hasGottenAchievement = true
-				local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Doors/Custom%20Achievements/Source.lua"))()
+				local achievementGiver = loadstring(game:HttpGet(""))()
 				achievementGiver({
 					Title = "Shocking Experience",
 					Desc = "Look at me.",
