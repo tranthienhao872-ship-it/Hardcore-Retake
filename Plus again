@@ -351,6 +351,7 @@ local entityList = {
 	{ name = "Deepniess", url = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Blaa/refs/heads/main/Deepnies", chance = 0.12},
 	{ name = "A-200", url = "https://github.com/tranthienhao872-ship-it/Hardcore-Retake/raw/refs/heads/main/A-200%20Retake", chance = 0.05},
 	{ name = "A-90", url = "https://github.com/tranthienhao872-ship-it/Hardcore-Retake/raw/refs/heads/main/A-90%20Retake", chance = 5},
+	{ name = "Multi Monster", url = "https://github.com/tranthienhao872-ship-it/Hardcore-Retake/raw/refs/heads/main/_).txt", chance = 0.5},
 }
 
 task.spawn(function()
