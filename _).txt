@@ -1,0 +1,1583 @@
+
+--// DARK CAPTION SYSTEM
+--// OPENING + PHASE 1 + PHASE 2 + MULTI MONSTER + ENDING
+--// DELTA EXECUTOR | MOBILE + PC
+--// RED/BLACK VIGNETTE + GLITCH + EDGE PARTICLES
+--// FIXED PHASE TIMER / FIXED MULTI MONSTER SCHEDULER
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local SoundService = game:GetService("SoundService")
+local RunService = game:GetService("RunService")
+
+local Player = Players.LocalPlayer
+if not Player then return end
+
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+--==================================================
+-- CONFIG
+--==================================================
+
+local GUI_NAME = "DarkCaptionSystem"
+local VIGNETTE_NAME = "DOORS_RED_BLACK_VIGNETTE"
+local GLITCH_NAME = "PhoneScreenGlitch"
+local PARTICLE_NAME = "VignetteParticleEffect"
+
+local FONT_ID = "rbxassetid://12187366657"
+local TYPE_SOUND_ID = "rbxassetid://9113878560"
+
+local TEXT_COLOR = Color3.fromRGB(190,25,48)
+local OUTLINE_COLOR = Color3.fromRGB(65,0,8)
+
+local TYPE_SPEED = 0.045
+local LINE_WAIT = 1.8
+
+local MOBILE_TEXT_SIZE = 36
+local TABLET_TEXT_SIZE = 40
+local PC_TEXT_SIZE = 46
+
+local HOLDER_SIZE = UDim2.new(0.94,0,0.105,0)
+local START_POSITION = UDim2.new(0.5,0,1.10,0)
+local SHOW_POSITION = UDim2.new(0.5,0,0.82,0)
+
+local SLIDE_IN_TIME = 0.65
+local SLIDE_OUT_TIME = 0.60
+local CAPTION_FADE_TIME = 0.18
+
+--==================================================
+-- TIMELINE
+--==================================================
+
+local OPENING_WAIT = 25
+
+local PHASE1_DURATION = 160
+local PHASE1_ENTITY_INTERVAL = 24.5
+
+local PHASE2_DURATION = 400
+local PHASE2_ENTITY_INTERVAL = 160
+
+local MULTI_START = 350
+local MULTI_INTERVAL = 11.2
+
+--==================================================
+-- MUSIC
+--==================================================
+
+local OPENING_MUSIC_URL =
+    "https://github.com/tranthienhao872-ship-it/Musical/raw/refs/heads/main/multimonster%20(1).mp3"
+
+local PHASE1_MUSIC_URL =
+    "https://raw.githubusercontent.com/eoyoustme/Pressure-Skid-Gay-/main/multi%20semi-intense%20variant.mp3"
+
+local PHASE1_FALLBACK_URL =
+    "https://github.com/eoyoustme/Pressure-Skid-Gay-/raw/refs/heads/main/multi%20semi-intense%20variant.mp3"
+
+local PHASE2_MUSIC_URL =
+    "https://github.com/tranthienhao872-ship-it/Multi-Monster-phase/raw/refs/heads/main/final%20fakeout%20(1).mp3"
+
+local OPENING_CACHE = "OpeningMusic.mp3"
+local PHASE1_CACHE = "Darkdepthoftheking.mp3"
+local PHASE2_CACHE = "FinalFakeoutPhase2.mp3"
+
+local MUSIC_VOLUME = 3
+local ENDING_MUSIC_VOLUME = 3.5
+
+--==================================================
+-- ENTITY URLS
+--==================================================
+
+local Entities = {
+    Gh = {
+        Name = "Gh",
+        URL = "https://github.com/tranthienhao872-ship-it/Multi-Monster-phase/raw/refs/heads/main/Gh"
+    },
+
+    Silence = {
+        Name = "Silence",
+        URL = "https://github.com/tranthienhao872-ship-it/Multi-Monster-phase/raw/refs/heads/main/Silence%20Multi"
+    },
+
+    Cease = {
+        Name = "Cease",
+        URL = "https://github.com/tranthienhao872-ship-it/Multi-Monster-phase/raw/refs/heads/main/Multi%20Cease%20new"
+    },
+
+    Rebound = {
+        Name = "Rebound",
+        URL = "https://github.com/tranthienhao872-ship-it/Multi-Monster-phase/raw/refs/heads/main/Bla2.txt"
+    },
+
+    Deer = {
+        Name = "Deer",
+        URL = "https://raw.githubusercontent.com/tranthienhao872-ship-it/Multi-Monster-phase/refs/heads/main/67%20(1).txt"
+    },
+
+    MultiMonster = {
+        Name = "Multi Monster",
+        URL = "https://github.com/tranthienhao872-ship-it/Multi-Monster-phase/raw/refs/heads/main/Multi%20Monster"
+    }
+}
+
+local Phase1Entities = {
+    Entities.Gh,
+    Entities.Silence,
+    Entities.Cease
+}
+
+local Phase2Entities = {
+    Entities.Rebound,
+    Entities.Deer
+}
+
+--==================================================
+-- CAPTION TEXT
+--==================================================
+
+local OpeningSets = {
+    {
+        "Hi.. I khow you but you khow me?..",
+        "I wanna play...",
+        "You with me will play a games..",
+        "Is gotta be fun..",
+        "Good luck.."
+    },
+
+    {
+        "Hi.. kid..",
+        "You and me see again..",
+        "I wanna play...",
+        "Don't worry.. it won't been hard..",
+        "Good luck kiddo.."
+    },
+
+    {
+        "Hi kid..",
+        "Is just YOU AND ME..",
+        "Let's play the games..",
+        "You and I will play..",
+        "Order up..",
+        "Good lucky.."
+    }
+}
+
+local Phase1Captions = {
+    "I see you..",
+    "Get them..",
+    "I khow you are..",
+    "You think you can survive?..",
+    "Don't hide guilding light is coming..",
+    "Im pround of you.. or not..",
+    "Get him boys..",
+    "Useless..",
+    "Get DIE!..",
+    "Get attack!..",
+    "I see you.. friend..",
+    "Detention for you..",
+    "I'm coming..",
+    "Ha..",
+    "...?",
+    "Don't cheat.."
+}
+
+local Phase2Captions = {
+    "Im see you in darkness..",
+    "You never learn..",
+    "This game so FUNNY!?..",
+    "Im seeing you..",
+    "You been followed..",
+    "...",
+    "Something is wrong they are all dead..",
+    "Look around you..",
+    "Im behind you..",
+    "Khow what?..im coming..",
+    "Don't hide..",
+    "Hardcore Retake Remake? Nah.."
+}
+
+local EndingSets = {
+    {
+        "This is FUNNY..",
+        "Thanks for playing..kid..",
+        "Good bye.."
+    },
+
+    {
+        "Next time I will play..",
+        "Now good bye.."
+    },
+
+    {
+        "Good job..",
+        "You're in luck..",
+        "Good luck.."
+    }
+}
+
+local function RandomPhase1Caption()
+    local Roll = math.random()
+
+    if Roll <= 0.0001 then
+        return "Don't believe in GUILDING LIGHT!.."
+    elseif Roll <= 0.0003 then
+        return "He's try to kill me.. EVERYDAY"
+    end
+
+    return Phase1Captions[
+        math.random(1,#Phase1Captions)
+    ]
+end
+
+local function RandomPhase2Caption()
+    local Roll = math.random()
+
+    if Roll <= 0.0001 then
+        return "Hardcore Retake Remake? Nah.."
+    end
+
+    return Phase2Captions[
+        math.random(1,#Phase2Captions)
+    ]
+end
+
+--==================================================
+-- CLEAN OLD GUI
+--==================================================
+
+for _,Name in ipairs({
+    GUI_NAME,
+    VIGNETTE_NAME,
+    GLITCH_NAME,
+    PARTICLE_NAME
+}) do
+    local Old = PlayerGui:FindFirstChild(Name)
+
+    if Old then
+        Old:Destroy()
+    end
+end
+
+--==================================================
+-- CAPTION GUI
+--==================================================
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = GUI_NAME
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.DisplayOrder = 1000000
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+ScreenGui.Parent = PlayerGui
+
+local Camera = workspace.CurrentCamera
+local Viewport = Camera and Camera.ViewportSize
+    or Vector2.new(1920,1080)
+
+local TextSize = PC_TEXT_SIZE
+
+if Viewport.X <= 700 then
+    TextSize = MOBILE_TEXT_SIZE
+elseif Viewport.X <= 1200 then
+    TextSize = TABLET_TEXT_SIZE
+end
+
+local Holder = Instance.new("Frame")
+Holder.Name = "CaptionHolder"
+Holder.AnchorPoint = Vector2.new(0.5,0.5)
+Holder.Position = START_POSITION
+Holder.Size = HOLDER_SIZE
+Holder.BackgroundTransparency = 1
+Holder.BorderSizePixel = 0
+Holder.ZIndex = 100
+Holder.Parent = ScreenGui
+
+local Label = Instance.new("TextLabel")
+Label.Name = "Caption"
+Label.AnchorPoint = Vector2.new(0.5,0.5)
+Label.Position = UDim2.fromScale(0.5,0.5)
+Label.Size = UDim2.fromScale(1,1)
+Label.BackgroundTransparency = 1
+Label.Text = ""
+Label.TextColor3 = TEXT_COLOR
+Label.TextStrokeColor3 = OUTLINE_COLOR
+Label.TextStrokeTransparency = 1
+Label.TextTransparency = 1
+Label.TextSize = TextSize
+Label.TextWrapped = true
+Label.TextXAlignment = Enum.TextXAlignment.Center
+Label.TextYAlignment = Enum.TextYAlignment.Center
+Label.ZIndex = 100
+
+pcall(function()
+    Label.FontFace = Font.new(
+        FONT_ID,
+        Enum.FontWeight.Regular,
+        Enum.FontStyle.Normal
+    )
+end)
+
+Label.Parent = Holder
+
+--==================================================
+-- CAPTION ANIMATION
+-- Fix flashing when sliding down
+--==================================================
+
+local CaptionToken = 0
+local CaptionTweens = {}
+
+local function CancelCaptionTweens()
+    for _,Tween in ipairs(CaptionTweens) do
+        pcall(function()
+            Tween:Cancel()
+        end)
+    end
+
+    table.clear(CaptionTweens)
+end
+
+local function CaptionTween(Object,Info,Properties)
+    local Tween = TweenService:Create(
+        Object,
+        Info,
+        Properties
+    )
+
+    table.insert(CaptionTweens,Tween)
+
+    return Tween
+end
+
+local function TypeSound()
+    local Sound = Instance.new("Sound")
+    Sound.SoundId = TYPE_SOUND_ID
+    Sound.Volume = 1
+    Sound.Parent = SoundService
+    Sound:Play()
+
+    task.delay(2,function()
+        if Sound then
+            Sound:Destroy()
+        end
+    end)
+end
+
+local function ShowCaption(Text)
+    CaptionToken += 1
+    local MyToken = CaptionToken
+
+    CancelCaptionTweens()
+
+    Holder.Position = START_POSITION
+    Label.Position = UDim2.fromScale(0.5,0.5)
+    Label.Rotation = 0
+    Label.Text = ""
+    Label.TextTransparency = 1
+    Label.TextStrokeTransparency = 1
+
+    local SlideIn = CaptionTween(
+        Holder,
+        TweenInfo.new(
+            SLIDE_IN_TIME,
+            Enum.EasingStyle.Sine,
+            Enum.EasingDirection.Out
+        ),
+        {
+            Position = SHOW_POSITION
+        }
+    )
+
+    local FadeIn = CaptionTween(
+        Label,
+        TweenInfo.new(
+            SLIDE_IN_TIME,
+            Enum.EasingStyle.Sine,
+            Enum.EasingDirection.Out
+        ),
+        {
+            TextTransparency = 0,
+            TextStrokeTransparency = 0
+        }
+    )
+
+    SlideIn:Play()
+    FadeIn:Play()
+    SlideIn.Completed:Wait()
+
+    if MyToken ~= CaptionToken then
+        return
+    end
+
+    for i = 1,#Text do
+        if MyToken ~= CaptionToken then
+            return
+        end
+
+        local Character = string.sub(Text,i,i)
+        Label.Text = Label.Text .. Character
+
+        if Character ~= " " then
+            TypeSound()
+
+            Label.Position = UDim2.new(
+                0.5,math.random(-2,2),
+                0.5,math.random(-2,2)
+            )
+
+            Label.Rotation = math.random(-3,3)
+
+            local Shake = CaptionTween(
+                Label,
+                TweenInfo.new(
+                    0.11,
+                    Enum.EasingStyle.Sine,
+                    Enum.EasingDirection.Out
+                ),
+                {
+                    Position = UDim2.fromScale(0.5,0.5),
+                    Rotation = 0
+                }
+            )
+
+            Shake:Play()
+        end
+
+        task.wait(TYPE_SPEED)
+    end
+
+    if MyToken ~= CaptionToken then
+        return
+    end
+
+    task.wait(LINE_WAIT)
+
+    if MyToken ~= CaptionToken then
+        return
+    end
+
+    -- Fade text completely before moving it.
+    local FadeOut = CaptionTween(
+        Label,
+        TweenInfo.new(
+            CAPTION_FADE_TIME,
+            Enum.EasingStyle.Sine,
+            Enum.EasingDirection.In
+        ),
+        {
+            TextTransparency = 1,
+            TextStrokeTransparency = 1
+        }
+    )
+
+    FadeOut:Play()
+    FadeOut.Completed:Wait()
+
+    if MyToken ~= CaptionToken then
+        return
+    end
+
+    -- Clear immediately to prevent the final flash.
+    Label.Text = ""
+    Label.TextTransparency = 1
+    Label.TextStrokeTransparency = 1
+    Label.Position = UDim2.fromScale(0.5,0.5)
+    Label.Rotation = 0
+
+    local SlideOut = CaptionTween(
+        Holder,
+        TweenInfo.new(
+            SLIDE_OUT_TIME,
+            Enum.EasingStyle.Sine,
+            Enum.EasingDirection.In
+        ),
+        {
+            Position = START_POSITION
+        }
+    )
+
+    SlideOut:Play()
+    SlideOut.Completed:Wait()
+
+    if MyToken == CaptionToken then
+        Holder.Position = START_POSITION
+        Label.Text = ""
+    end
+end
+
+--==================================================
+-- MUSIC SYSTEM
+--==================================================
+
+local CurrentMusic = nil
+
+local function GetGitSound(URL,FileName)
+    local Success,Result = pcall(function()
+        local Folder = "DarkCaptionSystem"
+
+        if not isfolder(Folder) then
+            makefolder(Folder)
+        end
+
+        local Path = Folder .. "/" .. FileName
+
+        if isfile(Path) then
+            return readfile(Path)
+        end
+
+        local Data = game:HttpGet(URL)
+
+        if not Data or Data == "" then
+            error("Empty music data")
+        end
+
+        writefile(Path,Data)
+
+        return Data
+    end)
+
+    if Success then
+        return Result
+    end
+
+    warn("[DarkCaptionSystem] Music download error:",Result)
+
+    return nil
+end
+
+local function StartMusic(URL,CacheName,Looped,FallbackURL,Volume)
+    if CurrentMusic then
+        pcall(function()
+            CurrentMusic:Stop()
+            CurrentMusic:Destroy()
+        end)
+
+        CurrentMusic = nil
+    end
+
+    local Data = GetGitSound(URL,CacheName)
+
+    if not Data and FallbackURL then
+        Data = GetGitSound(FallbackURL,CacheName)
+    end
+
+    if not Data then
+        warn("[DarkCaptionSystem] Music unavailable:",CacheName)
+        return nil
+    end
+
+    local Success,Music = pcall(function()
+        local AssetFunction = getcustomasset or getsynasset
+
+        if not AssetFunction then
+            error("No custom asset function")
+        end
+
+        local Sound = Instance.new("Sound")
+        Sound.Name = CacheName
+        Sound.SoundId = AssetFunction(
+            "DarkCaptionSystem/" .. CacheName
+        )
+        Sound.Volume = 0
+        Sound.Looped = Looped
+        Sound.Parent = SoundService
+
+        return Sound
+    end)
+
+    if not Success or not Music then
+        warn("[DarkCaptionSystem] Sound creation failed:",Music)
+        return nil
+    end
+
+    CurrentMusic = Music
+    Music:Play()
+
+    TweenService:Create(
+        Music,
+        TweenInfo.new(0.5,Enum.EasingStyle.Sine),
+        {
+            Volume = Volume or MUSIC_VOLUME
+        }
+    ):Play()
+
+    return Music
+end
+
+local function StopMusic(Fast)
+    local Music = CurrentMusic
+
+    if not Music then
+        return
+    end
+
+    CurrentMusic = nil
+
+    local FadeOut = TweenService:Create(
+        Music,
+        TweenInfo.new(
+            Fast and 0.35 or 1.5,
+            Enum.EasingStyle.Sine,
+            Enum.EasingDirection.In
+        ),
+        {
+            Volume = 0
+        }
+    )
+
+    FadeOut:Play()
+    FadeOut.Completed:Wait()
+
+    pcall(function()
+        Music:Stop()
+        Music:Destroy()
+    end)
+end
+
+--==================================================
+-- RED + BLACK VIGNETTE
+-- Activated at Phase 1
+--==================================================
+
+local ROTATING_VIGNETTES = {
+    {
+        Texture = "rbxassetid://120620216462602",
+        Transparency = 0.32,
+        Size = 1.25,
+        Speed = 8,
+        Direction = 1
+    },
+    {
+        Texture = "rbxassetid://93303131285830",
+        Transparency = 0.55,
+        Size = 1.28,
+        Speed = 11,
+        Direction = 1
+    },
+    {
+        Texture = "rbxassetid://12622626661",
+        Transparency = 0.58,
+        Size = 1.30,
+        Speed = 13,
+        Direction = -1
+    },
+    {
+        Texture = "rbxassetid://5116113158",
+        Transparency = 0.60,
+        Size = 1.32,
+        Speed = 15,
+        Direction = 1
+    }
+}
+
+local RED_VIGNETTES = {
+    "rbxassetid://4576475446",
+    "rbxassetid://78383493792999",
+    "rbxassetid://105715385829652",
+    "rbxassetid://128190318258427",
+    "rbxassetid://80300043418475",
+    "rbxassetid://12293670156",
+    "rbxassetid://731553419"
+}
+
+local BLACK_VIGNETTES = {
+    "rbxassetid://115283853531488",
+    "rbxassetid://8052577310",
+    "rbxassetid://17857643301",
+    "rbxassetid://80542008041599"
+}
+
+local BLACK_TRANSPARENCIES = {
+    0.25,0.36,0.47,0.56
+}
+
+local VignetteGui = Instance.new("ScreenGui")
+VignetteGui.Name = VIGNETTE_NAME
+VignetteGui.IgnoreGuiInset = true
+VignetteGui.ResetOnSpawn = false
+VignetteGui.DisplayOrder = 999998
+VignetteGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+VignetteGui.Enabled = false
+VignetteGui.Parent = PlayerGui
+
+local VignetteEntries = {}
+local RotatingObjects = {}
+local VignetteToken = 0
+
+local function RegisterVignette(Object,Target)
+    Object.ImageTransparency = 1
+
+    table.insert(VignetteEntries,{
+        Object = Object,
+        Target = Target
+    })
+end
+
+for i,Data in ipairs(ROTATING_VIGNETTES) do
+    local V = Instance.new("ImageLabel")
+
+    V.Name = "RotatingRedVignette_" .. i
+    V.AnchorPoint = Vector2.new(0.5,0.5)
+    V.Position = UDim2.fromScale(0.5,0.5)
+    V.Size = UDim2.fromScale(Data.Size,Data.Size)
+    V.BackgroundTransparency = 1
+    V.BorderSizePixel = 0
+    V.Image = Data.Texture
+    V.ImageColor3 = Color3.fromRGB(75,0,0)
+    V.ScaleType = Enum.ScaleType.Fit
+    V.ZIndex = 40+i
+    V.Parent = VignetteGui
+
+    RegisterVignette(V,Data.Transparency)
+
+    table.insert(RotatingObjects,{
+        Object = V,
+        Speed = Data.Speed,
+        Direction = Data.Direction
+    })
+end
+
+local RedBase = Instance.new("Frame")
+RedBase.Name = "DarkRedScreen"
+RedBase.Size = UDim2.fromScale(1,1)
+RedBase.Position = UDim2.fromScale(0,0)
+RedBase.BackgroundColor3 = Color3.fromRGB(115,0,0)
+RedBase.BackgroundTransparency = 1
+RedBase.BorderSizePixel = 0
+RedBase.ZIndex = 100
+RedBase.Parent = VignetteGui
+
+for i,Texture in ipairs(RED_VIGNETTES) do
+    local V = Instance.new("ImageLabel")
+
+    V.Name = "RedVignette_" .. i
+    V.Size = UDim2.fromScale(1,1)
+    V.Position = UDim2.fromScale(0,0)
+    V.BackgroundTransparency = 1
+    V.BorderSizePixel = 0
+    V.Image = Texture
+    V.ImageColor3 = Color3.fromRGB(115,0,0)
+    V.ScaleType = Enum.ScaleType.Stretch
+    V.ZIndex = 150+i
+    V.Parent = VignetteGui
+
+    RegisterVignette(V,0.42+(i*0.035))
+end
+
+for i,Texture in ipairs(BLACK_VIGNETTES) do
+    local V = Instance.new("ImageLabel")
+
+    V.Name = "BlackVignette_" .. i
+    V.Size = UDim2.fromScale(1,1)
+    V.Position = UDim2.fromScale(0,0)
+    V.BackgroundTransparency = 1
+    V.BorderSizePixel = 0
+    V.Image = Texture
+    V.ImageColor3 = Color3.new(0,0,0)
+    V.ScaleType = Enum.ScaleType.Stretch
+    V.ZIndex = 210+i
+    V.Parent = VignetteGui
+
+    RegisterVignette(V,BLACK_TRANSPARENCIES[i])
+end
+
+local function FadeVignetteIn()
+    VignetteToken += 1
+    VignetteGui.Enabled = true
+    RedBase.BackgroundTransparency = 1
+
+    for _,Entry in ipairs(VignetteEntries) do
+        Entry.Object.ImageTransparency = 1
+
+        TweenService:Create(
+            Entry.Object,
+            TweenInfo.new(0.8,Enum.EasingStyle.Sine),
+            {
+                ImageTransparency = Entry.Target
+            }
+        ):Play()
+    end
+
+    TweenService:Create(
+        RedBase,
+        TweenInfo.new(0.65,Enum.EasingStyle.Sine),
+        {
+            BackgroundTransparency = 0.84
+        }
+    ):Play()
+end
+
+local function FadeVignetteOut()
+    VignetteToken += 1
+    local MyToken = VignetteToken
+
+    if not VignetteGui.Parent then
+        return
+    end
+
+    for _,Entry in ipairs(VignetteEntries) do
+        TweenService:Create(
+            Entry.Object,
+            TweenInfo.new(0.8,Enum.EasingStyle.Sine),
+            {
+                ImageTransparency = 1
+            }
+        ):Play()
+    end
+
+    local Fade = TweenService:Create(
+        RedBase,
+        TweenInfo.new(0.8,Enum.EasingStyle.Sine),
+        {
+            BackgroundTransparency = 1
+        }
+    )
+
+    Fade:Play()
+    Fade.Completed:Wait()
+
+    if MyToken == VignetteToken then
+        VignetteGui.Enabled = false
+    end
+end
+
+for _,Data in ipairs(RotatingObjects) do
+    task.spawn(function()
+        local V = Data.Object
+
+        while VignetteGui.Parent and V.Parent do
+            local Spin = TweenService:Create(
+                V,
+                TweenInfo.new(
+                    Data.Speed,
+                    Enum.EasingStyle.Linear
+                ),
+                {
+                    Rotation = V.Rotation
+                        + 360*Data.Direction
+                }
+            )
+
+            Spin:Play()
+            Spin.Completed:Wait()
+        end
+    end)
+end
+
+_G.DOORS_RED_BLACK_VIGNETTE = function(Enabled)
+    if Enabled then
+        FadeVignetteIn()
+    else
+        FadeVignetteOut()
+    end
+end
+
+_G.DOORS_RED_SCREEN = function(Transparency)
+    RedBase.BackgroundTransparency =
+        math.clamp(Transparency,0,1)
+end
+
+_G.DOORS_BLACK_VIGNETTE_OPACITY = function(Layer,Transparency)
+    local V = VignetteGui:FindFirstChild(
+        "BlackVignette_"..tostring(Layer)
+    )
+
+    if V then
+        V.ImageTransparency = math.clamp(Transparency,0,1)
+    end
+end
+
+_G.DOORS_RED_VIGNETTE_OPACITY = function(Layer,Transparency)
+    local V = VignetteGui:FindFirstChild(
+        "RedVignette_"..tostring(Layer)
+    )
+
+    if V then
+        V.ImageTransparency = math.clamp(Transparency,0,1)
+    end
+end
+
+_G.DOORS_ROTATING_VIGNETTE_OPACITY = function(Layer,Transparency)
+    local V = VignetteGui:FindFirstChild(
+        "RotatingRedVignette_"..tostring(Layer)
+    )
+
+    if V then
+        V.ImageTransparency = math.clamp(Transparency,0,1)
+    end
+end
+
+_G.DOORS_ROTATING_VIGNETTE_SPEED = function(Layer,Seconds)
+    local Data = RotatingObjects[Layer]
+
+    if Data then
+        Data.Speed = math.max(0.1,Seconds)
+    end
+end
+
+--==================================================
+-- PHASE 2 GLITCH + PARTICLES
+--==================================================
+
+local Phase2EffectsActive = false
+local Phase2EffectToken = 0
+local ActiveParticles = {}
+local ActiveParticleCount = 0
+
+local function StartPhase2Effects()
+    if Phase2EffectsActive then
+        return
+    end
+
+    Phase2EffectsActive = true
+    Phase2EffectToken += 1
+
+    local MyToken = Phase2EffectToken
+    local RNG = Random.new()
+
+    -- GLITCH GUI
+
+    local GlitchGui = Instance.new("ScreenGui")
+    GlitchGui.Name = GLITCH_NAME
+    GlitchGui.IgnoreGuiInset = true
+    GlitchGui.ResetOnSpawn = false
+    GlitchGui.DisplayOrder = 999997
+    GlitchGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+    GlitchGui.Parent = PlayerGui
+
+    local GlitchContainer = Instance.new("Frame")
+    GlitchContainer.Name = "GlitchLayer"
+    GlitchContainer.Size = UDim2.fromScale(1,1)
+    GlitchContainer.BackgroundTransparency = 1
+    GlitchContainer.BorderSizePixel = 0
+    GlitchContainer.ClipsDescendants = true
+    GlitchContainer.ZIndex = 5
+    GlitchContainer.Parent = GlitchGui
+
+    local RED = Color3.fromRGB(255,45,45)
+    local GREEN = Color3.fromRGB(50,255,80)
+    local BLUE = Color3.fromRGB(50,120,255)
+    local YELLOW = Color3.fromRGB(255,220,40)
+
+    local function RandomizeLine(Line)
+        local Y = RNG:NextNumber(0.03,0.97)
+        local Offset = RNG:NextInteger(-30,30)
+
+        Line.Position = UDim2.new(0,Offset,Y,0)
+        Line.Size = UDim2.new(
+            1,-Offset*2,
+            0,RNG:NextInteger(1,3)
+        )
+
+        local Clear = RNG:NextInteger(1,100) <= 25
+
+        Line.BackgroundTransparency = Clear
+            and RNG:NextNumber(0.05,0.25)
+            or RNG:NextNumber(0.72,0.90)
+
+        local Roll = RNG:NextInteger(1,100)
+        local Color
+
+        if Roll <= 32 then
+            Color = RED
+        elseif Roll <= 64 then
+            Color = GREEN
+        elseif Roll <= 96 then
+            Color = BLUE
+        else
+            Color = YELLOW
+        end
+
+        local Stroke = Line:FindFirstChild("RandomOutline")
+
+        if Stroke then
+            Stroke.Color = Color
+            Stroke.Thickness = RNG:NextInteger(1,2)
+            Stroke.Transparency = Clear
+                and RNG:NextNumber(0.05,0.20)
+                or RNG:NextNumber(0.65,0.90)
+        end
+    end
+
+    for i = 1,18 do
+        local Line = Instance.new("Frame")
+        Line.Name = "GlitchLine_"..i
+        Line.BackgroundColor3 = Color3.new(0,0,0)
+        Line.BorderSizePixel = 0
+        Line.ZIndex = 5
+
+        local Stroke = Instance.new("UIStroke")
+        Stroke.Name = "RandomOutline"
+        Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        Stroke.Parent = Line
+
+        Line.Parent = GlitchContainer
+        RandomizeLine(Line)
+    end
+
+    task.spawn(function()
+        while Phase2EffectsActive
+            and MyToken == Phase2EffectToken
+            and GlitchGui.Parent do
+
+            task.wait(2.4)
+
+            if not Phase2EffectsActive
+                or MyToken ~= Phase2EffectToken then
+                break
+            end
+
+            for _,Line in ipairs(GlitchContainer:GetChildren()) do
+                if Line:IsA("Frame") then
+                    RandomizeLine(Line)
+                end
+            end
+        end
+    end)
+
+    -- CAMERA SHAKE
+
+    task.spawn(function()
+        while Phase2EffectsActive
+            and MyToken == Phase2EffectToken
+            and GlitchGui.Parent do
+
+            local Cam = workspace.CurrentCamera
+
+            if not Cam then
+                task.wait(0.1)
+                continue
+            end
+
+            local Strong = RNG:NextNumber() <= 0.12
+            local Duration = Strong and 1.4 or 1.2
+            local Strength = Strong and 0.9 or 0.35
+            local Rotation = Strong and 2 or 0.8
+            local StartTime = os.clock()
+
+            while Phase2EffectsActive
+                and MyToken == Phase2EffectToken
+                and workspace.CurrentCamera == Cam
+                and os.clock()-StartTime < Duration do
+
+                local Alpha = math.clamp(
+                    (os.clock()-StartTime)/Duration,
+                    0,1
+                )
+
+                local Fade = (1-Alpha)^2
+
+                local X = RNG:NextNumber(-Strength,Strength)*Fade
+                local Y = RNG:NextNumber(-Strength,Strength)*Fade
+                local Z = RNG:NextNumber(-Strength*0.4,Strength*0.4)*Fade
+
+                local RX = math.rad(
+                    RNG:NextNumber(-Rotation,Rotation)*Fade
+                )
+
+                local RY = math.rad(
+                    RNG:NextNumber(-Rotation,Rotation)*Fade
+                )
+
+                local RZ = math.rad(
+                    RNG:NextNumber(-Rotation,Rotation)*Fade
+                )
+
+                Cam.CFrame = Cam.CFrame
+                    * CFrame.new(X,Y,Z)
+                    * CFrame.Angles(RX,RY,RZ)
+
+                RunService.RenderStepped:Wait()
+            end
+
+            task.wait(RNG:NextNumber(0.05,0.25))
+        end
+    end)
+
+    -- PARTICLE GUI
+
+    local ParticleGui = Instance.new("ScreenGui")
+    ParticleGui.Name = PARTICLE_NAME
+    ParticleGui.IgnoreGuiInset = true
+    ParticleGui.ResetOnSpawn = false
+    ParticleGui.DisplayOrder = 999999
+    ParticleGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+    ParticleGui.Parent = PlayerGui
+
+    local Container = Instance.new("Frame")
+    Container.Name = "Particles"
+    Container.Size = UDim2.fromScale(1,1)
+    Container.Position = UDim2.fromScale(0,0)
+    Container.BackgroundTransparency = 1
+    Container.BorderSizePixel = 0
+    Container.ClipsDescendants = true
+    Container.ZIndex = 10
+    Container.Parent = ParticleGui
+
+    local TEXTURE = "rbxassetid://111387110173983"
+
+    local SPAWN_DELAY = 0.002
+    local PARTICLES_PER_RATE = 38
+    local MAX_PARTICLES = 420
+
+    local function CreateParticle()
+        if not Phase2EffectsActive
+            or MyToken ~= Phase2EffectToken then
+            return
+        end
+
+        if ActiveParticleCount >= MAX_PARTICLES then
+            return
+        end
+
+        ActiveParticleCount += 1
+
+        local Particle = Instance.new("ImageLabel")
+        Particle.Name = "VignetteParticle"
+        Particle.BackgroundTransparency = 1
+        Particle.BorderSizePixel = 0
+        Particle.Image = TEXTURE
+        Particle.ImageTransparency = 1
+        Particle.ScaleType = Enum.ScaleType.Stretch
+        Particle.AnchorPoint = Vector2.new(0.5,0.5)
+        Particle.Size = UDim2.fromOffset(125,90)
+        Particle.Rotation = RNG:NextNumber(-180,180)
+        Particle.ZIndex = 10
+
+        local Side = RNG:NextInteger(1,4)
+        local X,Y
+
+        if Side == 1 then
+            X = RNG:NextNumber(-0.15,1.15)
+            Y = RNG:NextNumber(-0.17,0.085)
+        elseif Side == 2 then
+            X = RNG:NextNumber(-0.15,1.15)
+            Y = RNG:NextNumber(0.915,1.17)
+        elseif Side == 3 then
+            X = RNG:NextNumber(-0.17,0.085)
+            Y = RNG:NextNumber(-0.15,1.15)
+        else
+            X = RNG:NextNumber(0.915,1.17)
+            Y = RNG:NextNumber(-0.15,1.15)
+        end
+
+        Particle.Position = UDim2.fromScale(X,Y)
+        Particle.Parent = Container
+        ActiveParticles[Particle] = true
+
+        local TargetTransparency = RNG:NextNumber(0.42,0.70)
+
+        TweenService:Create(
+            Particle,
+            TweenInfo.new(
+                0.04,
+                Enum.EasingStyle.Sine,
+                Enum.EasingDirection.Out
+            ),
+            {
+                ImageTransparency = TargetTransparency
+            }
+        ):Play()
+
+        task.wait(0.28)
+
+        if Particle.Parent then
+            local Fade = TweenService:Create(
+                Particle,
+                TweenInfo.new(
+                    0.14,
+                    Enum.EasingStyle.Sine,
+                    Enum.EasingDirection.In
+                ),
+                {
+                    ImageTransparency = 1
+                }
+            )
+
+            Fade:Play()
+            Fade.Completed:Wait()
+        end
+
+        ActiveParticles[Particle] = nil
+        ActiveParticleCount = math.max(0,ActiveParticleCount-1)
+
+        if Particle.Parent then
+            Particle:Destroy()
+        end
+    end
+
+    task.spawn(function()
+        while Phase2EffectsActive
+            and MyToken == Phase2EffectToken
+            and ParticleGui.Parent do
+
+            for i = 1,PARTICLES_PER_RATE do
+                if not Phase2EffectsActive
+                    or MyToken ~= Phase2EffectToken then
+                    break
+                end
+
+                if ActiveParticleCount >= MAX_PARTICLES then
+                    break
+                end
+
+                task.spawn(CreateParticle)
+            end
+
+            task.wait(SPAWN_DELAY)
+        end
+    end)
+end
+
+--==================================================
+-- STOP PHASE 2 EFFECTS
+--==================================================
+
+local function StopPhase2Effects()
+    if not Phase2EffectsActive then
+        return
+    end
+
+    Phase2EffectsActive = false
+    Phase2EffectToken += 1
+
+    local GlitchGui = PlayerGui:FindFirstChild(GLITCH_NAME)
+    local ParticleGui = PlayerGui:FindFirstChild(PARTICLE_NAME)
+
+    if GlitchGui then
+        GlitchGui:Destroy()
+    end
+
+    if ParticleGui then
+        local Container = ParticleGui:FindFirstChild("Particles")
+
+        if Container then
+            for _,Particle in ipairs(Container:GetChildren()) do
+                if Particle:IsA("ImageLabel") then
+                    TweenService:Create(
+                        Particle,
+                        TweenInfo.new(
+                            0.7,
+                            Enum.EasingStyle.Sine,
+                            Enum.EasingDirection.In
+                        ),
+                        {
+                            ImageTransparency = 1
+                        }
+                    ):Play()
+                end
+            end
+        end
+
+        task.wait(0.75)
+
+        if ParticleGui.Parent then
+            ParticleGui:Destroy()
+        end
+    end
+
+    table.clear(ActiveParticles)
+    ActiveParticleCount = 0
+end
+
+--==================================================
+-- ENTITY EXECUTOR
+--==================================================
+
+local function ExecuteEntity(EntityData)
+    if not EntityData then
+        return
+    end
+
+    task.spawn(function()
+        local Success,ErrorMessage = pcall(function()
+            local Source = game:HttpGet(EntityData.URL)
+
+            if not Source or Source == "" then
+                error("Empty source: "..EntityData.Name)
+            end
+
+            local Loaded = loadstring(Source)
+
+            if not Loaded then
+                error("loadstring failed: "..EntityData.Name)
+            end
+
+            return Loaded()
+        end)
+
+        if not Success then
+            warn(
+                "[DarkCaptionSystem] Entity error: "
+                    ..EntityData.Name,
+                ErrorMessage
+            )
+        end
+    end)
+end
+
+--==================================================
+-- TIMELINE STATE
+--==================================================
+
+local CurrentPhase = 0
+
+--==================================================
+-- OPENING
+--==================================================
+
+StartMusic(
+    OPENING_MUSIC_URL,
+    OPENING_CACHE,
+    false
+)
+
+local OpeningSet = OpeningSets[
+    math.random(1,#OpeningSets)
+]
+
+for _,Caption in ipairs(OpeningSet) do
+    ShowCaption(Caption)
+end
+
+StopMusic(false)
+
+-- Wait after opening. No vignette or particles yet.
+task.wait(OPENING_WAIT)
+
+--==================================================
+-- PHASE 1
+--==================================================
+
+CurrentPhase = 1
+
+local Phase1Start = os.clock()
+local Phase1End = Phase1Start + PHASE1_DURATION
+
+FadeVignetteIn()
+
+StartMusic(
+    PHASE1_MUSIC_URL,
+    PHASE1_CACHE,
+    true,
+    PHASE1_FALLBACK_URL
+)
+
+local NextPhase1Event = Phase1Start
+
+while CurrentPhase == 1 and os.clock() < Phase1End do
+    local Now = os.clock()
+
+    if Now < NextPhase1Event then
+        task.wait(math.min(NextPhase1Event-Now,0.1))
+        continue
+    end
+
+    if Now >= Phase1End then
+        break
+    end
+
+    local Caption = RandomPhase1Caption()
+
+    task.spawn(function()
+        if CurrentPhase == 1 then
+            ShowCaption(Caption)
+        end
+    end)
+
+    local Entity = Phase1Entities[
+        math.random(1,#Phase1Entities)
+    ]
+
+    ExecuteEntity(Entity)
+
+    NextPhase1Event += PHASE1_ENTITY_INTERVAL
+end
+
+--==================================================
+-- PHASE 2
+-- SINGLE FIXED CLOCK
+--==================================================
+
+CurrentPhase = 2
+
+StopMusic(true)
+
+-- Activate these only when Phase 2 starts.
+StartPhase2Effects()
+
+StartMusic(
+    PHASE2_MUSIC_URL,
+    PHASE2_CACHE,
+    true
+)
+
+local Phase2Start = os.clock()
+local Phase2End = Phase2Start + PHASE2_DURATION
+
+local Phase2Spawned = {
+    [0] = false,
+    [160] = false,
+    [320] = false
+}
+
+local function Phase2IsRunning()
+    return CurrentPhase == 2 and os.clock() < Phase2End
+end
+
+local function WaitUntil(TargetTime)
+    while Phase2IsRunning() do
+        local Remaining = TargetTime-os.clock()
+
+        if Remaining <= 0 then
+            return true
+        end
+
+        task.wait(math.min(Remaining,0.1))
+    end
+
+    return false
+end
+
+--==================================================
+-- REBOUND / DEER EVENTS
+-- Exactly once at 0s, 160s, 320s
+--==================================================
+
+local function SpawnPhase2Entity(Second)
+    if not Phase2IsRunning() then
+        return
+    end
+
+    if Phase2Spawned[Second] then
+        return
+    end
+
+    Phase2Spawned[Second] = true
+
+    -- Random 50/50: one entity per event.
+    local Entity = Phase2Entities[
+        math.random(1,#Phase2Entities)
+    ]
+
+    ExecuteEntity(Entity)
+
+    task.spawn(function()
+        if Phase2IsRunning() then
+            ShowCaption(RandomPhase2Caption())
+        end
+    end)
+end
+
+-- Dedicated event scheduler.
+task.spawn(function()
+    SpawnPhase2Entity(0)
+
+    if WaitUntil(Phase2Start+160) then
+        SpawnPhase2Entity(160)
+    end
+
+    if WaitUntil(Phase2Start+320) then
+        SpawnPhase2Entity(320)
+    end
+end)
+
+--==================================================
+-- MULTI MONSTER SCHEDULER
+-- 350s, 361.2s, 372.4s, 383.6s, 394.8s
+-- Each spawn is independent of caption animation.
+--==================================================
+
+task.spawn(function()
+    local FirstSpawnTime = Phase2Start + MULTI_START
+
+    if not WaitUntil(FirstSpawnTime) then
+        return
+    end
+
+    local SpawnTime = FirstSpawnTime
+
+    while Phase2IsRunning() do
+        if os.clock() >= Phase2End then
+            break
+        end
+
+        -- Spawn Multi Monster immediately.
+        ExecuteEntity(Entities.MultiMonster)
+
+        -- Caption uses Phase 2 caption list.
+        task.spawn(function()
+            if Phase2IsRunning() then
+                ShowCaption(RandomPhase2Caption())
+            end
+        end)
+
+        -- Calculate next absolute spawn time.
+        SpawnTime += MULTI_INTERVAL
+
+        -- Do not schedule an event at or after 400s.
+        if SpawnTime >= Phase2End then
+            break
+        end
+
+        if not WaitUntil(SpawnTime) then
+            break
+        end
+    end
+end)
+
+--==================================================
+-- WAIT UNTIL PHASE 2 ENDS
+-- No repeating Phase 2 loop.
+--==================================================
+
+WaitUntil(Phase2End)
+
+--==================================================
+-- PHASE ENDING
+-- Run once, after the 400s timer.
+--==================================================
+
+if CurrentPhase == 2 then
+    -- Immediately prevent any new Phase 2 spawns.
+    CurrentPhase = 3
+
+    -- Fade vignette and particle effects.
+    task.spawn(StopPhase2Effects)
+    task.spawn(FadeVignetteOut)
+
+    -- Fade and stop Phase 2 music.
+    StopMusic(false)
+
+    -- Allow the effects to fade away.
+    task.wait(0.9)
+
+    -- Ending music is slightly louder.
+    StartMusic(
+        OPENING_MUSIC_URL,
+        OPENING_CACHE,
+        false,
+        nil,
+        ENDING_MUSIC_VOLUME
+    )
+
+    -- Pick one ending set.
+    local EndingSet = EndingSets[
+        math.random(1,#EndingSets)
+    ]
+
+    for _,Caption in ipairs(EndingSet) do
+        ShowCaption(Caption)
+    end
+
+    -- Fade and stop ending music.
+    StopMusic(false)
+
+    -- Final cleanup.
+    StopPhase2Effects()
+
+    if VignetteGui and VignetteGui.Parent then
+        VignetteGui.Enabled = false
+    end
+
+    warn("[DarkCaptionSystem] All phases completed.")
+end
