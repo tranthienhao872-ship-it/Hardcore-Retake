@@ -1,0 +1,317 @@
+--// HIGH-RATE EDGE VIGNETTE + CAMERA SHAKE
+--// Delta Executor | Mobile + PC
+--// NO GLITCH / NO MUSIC
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+--==================================================
+-- CLEAN OLD VIGNETTE
+--==================================================
+
+local oldVignette = playerGui:FindFirstChild("VignetteParticleEffect")
+if oldVignette then
+    oldVignette:Destroy()
+end
+
+--==================================================
+-- SETTINGS
+--==================================================
+
+local rng = Random.new()
+
+local TEXTURE_ID = "rbxassetid://104406833226191"
+
+-- HIGH RATE
+local SPAWN_DELAY = 0.002
+local PARTICLES_PER_RATE = 38
+local MAX_PARTICLES = 420
+
+-- PARTICLE SIZE
+local PARTICLE_WIDTH = 125
+local PARTICLE_HEIGHT = 90
+
+-- PARTICLE LIFE
+local LIFE_TIME = 0.28
+local FADE_IN_TIME = 0.04
+local FADE_OUT_TIME = 0.14
+
+-- TRANSPARENCY
+local MIN_TRANSPARENCY = 0.42
+local MAX_TRANSPARENCY = 0.70
+
+-- RANDOM ROTATION
+local MIN_ROTATION = -180
+local MAX_ROTATION = 180
+
+local activeParticles = 0
+
+--==================================================
+-- VIGNETTE GUI
+--==================================================
+
+local vignetteGui = Instance.new("ScreenGui")
+vignetteGui.Name = "VignetteParticleEffect"
+vignetteGui.IgnoreGuiInset = true
+vignetteGui.ResetOnSpawn = false
+vignetteGui.DisplayOrder = 999999
+vignetteGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+vignetteGui.Parent = playerGui
+
+--==================================================
+-- VIGNETTE CONTAINER
+--==================================================
+
+local container = Instance.new("Frame")
+container.Name = "Particles"
+container.Size = UDim2.fromScale(1, 1)
+container.Position = UDim2.fromScale(0, 0)
+container.BackgroundTransparency = 1
+container.BorderSizePixel = 0
+container.ClipsDescendants = true
+container.ZIndex = 10
+container.Parent = vignetteGui
+
+--==================================================
+-- CREATE VIGNETTE PARTICLE
+--==================================================
+
+local function createParticle()
+    if not vignetteGui.Parent then
+        return
+    end
+
+    if activeParticles >= MAX_PARTICLES then
+        return
+    end
+
+    activeParticles += 1
+
+    local particle = Instance.new("ImageLabel")
+    particle.Name = "VignetteParticle"
+    particle.BackgroundTransparency = 1
+    particle.BorderSizePixel = 0
+    particle.Image = TEXTURE_ID
+    particle.ImageTransparency = 1
+    particle.ScaleType = Enum.ScaleType.Stretch
+    particle.AnchorPoint = Vector2.new(0.5, 0.5)
+    particle.ZIndex = 10
+
+    particle.Size = UDim2.fromOffset(
+        PARTICLE_WIDTH,
+        PARTICLE_HEIGHT
+    )
+
+    -- RANDOM ROTATION
+    particle.Rotation = rng:NextNumber(
+        MIN_ROTATION,
+        MAX_ROTATION
+    )
+
+    --==================================================
+    -- RANDOM EDGE POSITION
+    --==================================================
+
+    local side = rng:NextInteger(1, 4)
+    local x, y
+
+    if side == 1 then
+        -- TOP EDGE
+        x = rng:NextNumber(-0.15, 1.15)
+        y = rng:NextNumber(-0.17, 0.085)
+
+    elseif side == 2 then
+        -- BOTTOM EDGE
+        x = rng:NextNumber(-0.15, 1.15)
+        y = rng:NextNumber(0.915, 1.17)
+
+    elseif side == 3 then
+        -- LEFT EDGE
+        x = rng:NextNumber(-0.17, 0.085)
+        y = rng:NextNumber(-0.15, 1.15)
+
+    else
+        -- RIGHT EDGE
+        x = rng:NextNumber(0.915, 1.17)
+        y = rng:NextNumber(-0.15, 1.15)
+    end
+
+    particle.Position = UDim2.fromScale(x, y)
+    particle.Parent = container
+
+    --==================================================
+    -- RANDOM TRANSPARENCY
+    --==================================================
+
+    local finalTransparency = rng:NextNumber(
+        MIN_TRANSPARENCY,
+        MAX_TRANSPARENCY
+    )
+
+    --==================================================
+    -- FADE IN
+    --==================================================
+
+    local fadeIn = TweenService:Create(
+        particle,
+        TweenInfo.new(
+            FADE_IN_TIME,
+            Enum.EasingStyle.Sine,
+            Enum.EasingDirection.Out
+        ),
+        {
+            ImageTransparency = finalTransparency
+        }
+    )
+
+    fadeIn:Play()
+
+    --==================================================
+    -- HOLD
+    --==================================================
+
+    task.wait(LIFE_TIME)
+
+    --==================================================
+    -- FADE OUT
+    --==================================================
+
+    if particle.Parent then
+        local fadeOut = TweenService:Create(
+            particle,
+            TweenInfo.new(
+                FADE_OUT_TIME,
+                Enum.EasingStyle.Sine,
+                Enum.EasingDirection.In
+            ),
+            {
+                ImageTransparency = 1
+            }
+        )
+
+        fadeOut:Play()
+        fadeOut.Completed:Wait()
+    end
+
+    --==================================================
+    -- REMOVE PARTICLE
+    --==================================================
+
+    particle:Destroy()
+    activeParticles = math.max(0, activeParticles - 1)
+end
+
+--==================================================
+-- HIGH-RATE EDGE SPAWN LOOP
+--==================================================
+
+task.spawn(function()
+    while vignetteGui.Parent do
+        for i = 1, PARTICLES_PER_RATE do
+            if not vignetteGui.Parent then
+                break
+            end
+
+            if activeParticles >= MAX_PARTICLES then
+                break
+            end
+
+            task.spawn(createParticle)
+        end
+
+        task.wait(SPAWN_DELAY)
+    end
+end)
+
+--==================================================
+-- CAMERA SHAKE
+--==================================================
+
+task.spawn(function()
+    while vignetteGui.Parent do
+        local camera = workspace.CurrentCamera
+
+        if not camera then
+            task.wait(0.1)
+            continue
+        end
+
+        -- 12% CHANCE OF STRONG SHAKE
+        local strong = rng:NextNumber(0, 1) <= 0.12
+
+        local duration
+        local strength
+        local rotation
+
+        if strong then
+            duration = 1.4
+            strength = 0.9
+            rotation = 2
+        else
+            duration = 1.2
+            strength = 0.35
+            rotation = 0.8
+        end
+
+        local startTime = os.clock()
+
+        while vignetteGui.Parent
+            and workspace.CurrentCamera == camera
+            and os.clock() - startTime < duration do
+
+            local elapsed = os.clock() - startTime
+            local alpha = math.clamp(
+                elapsed / duration,
+                0,
+                1
+            )
+
+            local fade = (1 - alpha) ^ 2
+
+            local x = rng:NextNumber(
+                -strength,
+                strength
+            ) * fade
+
+            local y = rng:NextNumber(
+                -strength,
+                strength
+            ) * fade
+
+            local z = rng:NextNumber(
+                -strength * 0.4,
+                strength * 0.4
+            ) * fade
+
+            local rx = math.rad(
+                rng:NextNumber(-rotation, rotation) * fade
+            )
+
+            local ry = math.rad(
+                rng:NextNumber(-rotation, rotation) * fade
+            )
+
+            local rz = math.rad(
+                rng:NextNumber(-rotation, rotation) * fade
+            )
+
+            camera.CFrame = camera.CFrame
+                * CFrame.new(x, y, z)
+                * CFrame.Angles(rx, ry, rz)
+
+            RunService.RenderStepped:Wait()
+        end
+
+        task.wait(rng:NextNumber(0.05, 0.25))
+    end
+end)
+
+--==================================================
+-- END
+-- VIGNETTE + CAMERA SHAKE ONLY
+-- NO GLITCH / NO MUSIC
+--==================================================
